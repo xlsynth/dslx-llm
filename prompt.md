@@ -24,6 +24,22 @@ Note the differences from Rust well: all literals must be prefixed with their ty
 
 **Compile-Time Assertions** In DSLX the `const_assert!(cond)` built-in is available for compile-time checks of preconditions. This can be useful for asserting properties of parametric integer values or properties of compile-time constants.
 
+**Width Slices** To slice bits out of a value in DSLX there is a "width slice" syntax that extracts some number of bits (given by a type) from a given starting position in the value -- note that the starting position may be dynamic:
+
+```dslx
+#[test]
+fn show_width_slice() {
+    let x = u16:0xabcd;
+    let d: u4 = x[0 +: u4];
+    assert_eq(d, u4:0xd);
+    let a: u4 = x[12 +: u4];
+    assert_eq(a, u4:0xa);
+    // Slicing past the end we get zero-fill.
+    let past_end = x[14 +: u4];
+    assert_eq(past_end, u4:0xa >> 2);
+}
+```
+
 **Enums Require Underlying Width** Unlike in Rust in DSLX we have to note what the integer type underlying an enum is, and enums cannot be sum types as in Rust; in DSLX:
 
 ```dslx
