@@ -46,7 +46,9 @@ fn show_width_slice() {
 enum MyEnum: u8 { A = 0, B = 7, C = 255 }
 ```
 
-**Array Type Syntax** Array types are written with different syntax from Rust; in Rust we’d write `[u8; 4]` but in DSLX we write `u8[4]`. For multi-dimensional arrays in Rust we’d write `[[u8; 4]; 2]` but in DSLX we write `u8[4][2]` . Indexing works similarly to Rust, we index the outer array before indexing the inner array; i.e. we index the `2` dimension and we get a `u8[4]` and we subsequently index that.
+**Array Type Syntax** Array types are written with different syntax from Rust; in Rust we’d write `[u8; 4]` but in DSLX we write `u8[4]`.
+
+**Multi-Dimensional Array Types and Indexing** For multi-dimensional arrays in Rust we’d write `[[u8; 4]; 2]` but in DSLX we write `u8[4][2]`. Note **very well** that the `2` is the first dimension indexed in that DSLX type! Which is to say, the indexing works similarly to Rust, we index the outer array before indexing the inner array; i.e. we index the `2` dimension and we get a `u8[4]` and we can subsequently index that to get a single `u8`. Don't be fooled by the fact it looks more like C syntax, the first dimension written in the multi-dimensional array type is not the first dimension indexed.
 
 ```dslx
 #[test]
@@ -86,6 +88,16 @@ struct MyStruct { my_field: u2, my_enum_field: MyEnum }
 fn show_zero_builtin() {
     let s = zero!<MyStruct>();
     assert_eq!(s, MyStruct { my_field: u2:0, my_enum_field: MyEnum::ONLY_VALUE })
+}
+```
+
+**Array Reverse Built-In** DSLX has a built-in primitive for array reversal called `array_rev`:
+
+```dslx
+#[test]
+fn show_array_rev() {
+    let a = u4[3]:[0, 1, 2];
+    assert_eq(array_rev(a), u4[3]:[2, 1, 0]);
 }
 ```
 
@@ -153,6 +165,32 @@ Also observe that the parametric `X` is filled in implicitly by the argument typ
 #[test]
 fn show_parametric_widen_2x_explicit() {
      assert_eq(parametric_widen_2x<u32:2>(u2:2), u4:2);
+}
+```
+
+**Constructing Parameterized Types** It's common to want to construct an type with a number of bits based on a compile-time constant value. `uN` is the unsigned bits type constructor, and `sN` is the signed bits type constructor -- they can be instantiated with a literal value or a constant name or simple expressions. It is often most readable to instantiate them using a named constant:
+
+```dslx
+#[test]
+fn show_parameterized_type_constructors() {
+    const N = u32:4;
+    let x = uN[N]:0b1100;
+    let y = sN[N]:0b1100;
+    assert_eq(y as uN[N], x);
+    assert_eq(uN[4]:12, x)
+}
+```
+
+**Map Built-In** The `map` built-in can map a function over every element in an array to produce the transformed array. Unlike in Rust, functions must be defined at module scope, and in define-before-use order -- there are no lambdas/closures:
+
+```dslx
+fn add_one<N: u32>(e: uN[N]) -> uN[N] { e + uN[N]:1 }
+
+#[test]
+fn show_map() {
+    let x = u4[4]:[0, 1, 2, 3];
+    let y = map(x, add_one);
+    assert_eq(y, u4[4]:[1, 2, 3, 4]);
 }
 ```
 
