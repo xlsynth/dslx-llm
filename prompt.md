@@ -5,11 +5,7 @@ To count the number of bits in a `u32`:
 ```dslx
 import std;  // import standard library
 fn count_bits(x: u32) -> u32 { std::popcount(x) }  // call library function
-```
 
-Note that there is no `mod` keyword to define a scoped module like there is in Rust — in DSLX all modules are single files. This is how we write a test for the function we made
-
-```dslx
 #[test]
 fn test_count_bits() {
     assert_eq(count_bits(u32:0), u32:0);  // 0 value has 0 bits set
@@ -18,7 +14,9 @@ fn test_count_bits() {
 }
 ```
 
-Note the differences from Rust well: all literals must be prefixed with their type and a colon. Instead of `assert_eq!` being a macro as it is in Rust it is a built-in function so it has no exclamation mark.
+Note the differences from Rust: all literals must be prefixed with their type and a colon. Instead of `assert_eq!` being a macro as it is in Rust it is a built-in function so it has no exclamation mark.
+
+**No `mod` keyword** There is no `mod` keyword to define a scoped module like there is in Rust — in DSLX all modules are single files.
 
 **Standard Library Function for Bit-widths** `std::clog2(x)` is the standard library function that computes `ceil(log2(x))` which is often useful for determining bit-widths required to hold a binary number of a particular count of items. It gives back the same width type (unsigned integer) that it takes in.
 
@@ -53,7 +51,7 @@ enum MyEnum: u8 { A = 0, B = 7, C = 255 }
 ```dslx
 #[test]
 fn show_2d_indexing() {
-    const A: u8[2][3] = [[0, 1], [2, 3], [4, 5]];  // 3 elements that are u8[2]
+    const A = u8[2][3]:[[u8:0, u8:1], [u8:2, u8:3], [u8:4, u8:5]];  // 3 elements that are u8[2]
     assert_eq(A[1][0], u8:2);  // the first index `1` gives us the middle u8[2]
 }
 ```
@@ -63,8 +61,8 @@ fn show_2d_indexing() {
 ```dslx
 #[test]
 fn show_array_update() {
-    let a: u8[3] = [1, 2, 3];
-    let b: u8[3] = update(a, 1, u8:7); // update index `1` to be value `u8:7`
+    let a = u8[3]:[1, 2, 3];
+    let b: u8[3] = update(a, u32:1, u8:7); // update index `1` to be value `u8:7`
     assert_eq(b, u8[3]:[1, 7, 3])
 }
 ```
@@ -74,7 +72,7 @@ fn show_array_update() {
 ```dslx
 #[test]
 fn show_array_fill_notation() {
-    let a: u8[7] = [0, ...];
+    let a = u8[7]:[0, ...];
     assert_eq(a, u8[7]:[0, 0, 0, 0, 0, 0, 0]);
 }
 ```
@@ -87,7 +85,7 @@ struct MyStruct { my_field: u2, my_enum_field: MyEnum }
 #[test]
 fn show_zero_builtin() {
     let s = zero!<MyStruct>();
-    assert_eq!(s, MyStruct { my_field: u2:0, my_enum_field: MyEnum::ONLY_VALUE })
+    assert_eq(s, MyStruct { my_field: u2:0, my_enum_field: MyEnum::ONLY_VALUE })
 }
 ```
 
@@ -162,6 +160,8 @@ fn show_parametric_widen_2x() {
 Also observe that the parametric `X` is filled in implicitly by the argument type in the above example, but explicit instantiation is also allowed:
 
 ```dslx
+fn parametric_widen_2x<X: u32, Y: u32 = {X+X}>(x: uN[X]) -> uN[Y] { x as uN[Y] }
+
 #[test]
 fn show_parametric_widen_2x_explicit() {
      assert_eq(parametric_widen_2x<u32:2>(u2:2), u4:2);

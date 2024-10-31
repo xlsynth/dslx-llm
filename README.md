@@ -11,3 +11,11 @@ lifted into a recurrence in time. Knowledge of how to write functions as
 effective building blocks from software programming languages and associated
 program synthesis presumably side-steps some of the difficulty in learning
 Verilog semantics and challenges of structural and temporal composition.
+
+## Developer Tips
+
+To test the samples in the prompt Markdown:
+
+```
+$ DSLX_STDLIB_PATH=$HOME/opt/xlsynth/latest/xls/dslx/stdlib/ pytest test_prompt.py
+```
