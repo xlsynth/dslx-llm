@@ -44,4 +44,3 @@ def test_dslx_code_sample(code_sample):
         )
     finally:
         os.remove(tmp_filename)
-

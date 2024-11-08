@@ -194,6 +194,26 @@ fn show_map() {
 }
 ```
 
+**Match Construct** Pattern matching in DSLX is similar to Rust's, it just supports a subset of patterns that Rust supports. Prefer to use match expressions instead of if/else ladders. Tuples and constants can notably be pattern matched on:
+
+```dslx
+#[test]
+fn show_match() {
+    let my_tuple = (u32:42, u8:64);
+    let result = match my_tuple {
+        (u32:42, _) => u32:42,  // _ is wildcard matcher
+        (first, u8:64) => {  // match expression can be a block
+            first + u32:1
+        },
+        // DSLX can not determine exhaustiveness of patterns so a trailing wildcard is always necessary
+        // When the arm is effectively unreachable we can use the `fail!` built-in.
+        // Note the first argument to fail must be a valid Verilog identifier.
+        _ => fail!("first_should_match", u32:0)
+    };
+    assert_eq(result, u32:42)
+}
+```
+
 That is all of the tutorial content.
 
 ---
