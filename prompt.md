@@ -20,7 +20,7 @@ Note the differences from Rust: all literals must be prefixed with their type an
 
 **Standard Library Function for Bit-widths** `std::clog2(x)` is the standard library function that computes `ceil(log2(x))` which is often useful for determining bit-widths required to hold a binary number of a particular count of items. It gives back the same width type (unsigned integer) that it takes in.
 
-**Compile-Time Assertions** In DSLX the `const_assert!(cond)` built-in is available for compile-time checks of preconditions. This can be useful for asserting properties of parametric integer values or properties of compile-time constants.
+**Compile-Time Assertions** In DSLX the `const_assert!(cond)` built-in is available for compile-time checks of preconditions. This can be useful for asserting properties of parametric integer values or properties of compile-time constants. Be careful not to use it on runtime-defined values, like function parameters or values that are derived from function parameters -- in those cases prefer to use `assert!(condition, label)`.
 
 **Width Slices** To slice bits out of a value in DSLX there is a "width slice" syntax that extracts some number of bits (given by a type) from a given starting position in the value -- note that the starting position may be dynamic:
 
@@ -141,6 +141,24 @@ fn show_cast_of_a_literal() {
 }
 ```
 
+As a brief reminder of the Rust rules, if you extend an signed source number, a sign extension is performed, and if you extend an unsigned source number, a zero extension is performed:
+
+```dslx
+#[test]
+fn show_signed_source_extension_semantics() {
+    let original_signed = s4:-1;
+    assert_eq(original_signed as s6, s6:-1);
+    assert_eq(original_signed as u6, u6:0x3f);
+}
+
+#[test]
+fn show_unsigned_source_extension_semantics() {
+    let original_unsigned = u4:0xf;
+    assert_eq(original_unsigned as s6, s6:0xf);
+    assert_eq(original_unsigned as u6, u6:0xf);
+}
+```
+
 **Parameterized Functions** Parameterized functions in DSLX are similar to, but more powerful than, const generics in Rust. Parameterization in DSLX can do fairly arbitrary computation, and the syntax is shaped like so — note that any “derived parametric” values where we compute them based on other parametrics syntactically have their expressions in curls:
 
 ```dslx
@@ -229,6 +247,8 @@ fn multiplying_by_two_makes_even(x: u8) -> bool {
 When requested to create designs, using as many quickchecks as possible to test properties of the resulting design improves quality significantly.
 
 For parameterized designs it's nice to use smaller types in our quickchecks so that exhaustive testing (or other means of proving) of the quickcheck property is more of a viable option.
+
+**Define-Before-Use in Modules** Similar to C, and unlike in Rust, in DSLX you must define things lexically in the file before you refer to them; there are *not* forward declarations or automatic discovery of subsequent definitions.
 
 **That is all of the tutorial content.**
 
