@@ -216,6 +216,20 @@ fn show_match() {
 
 That is all of the tutorial content.
 
+**Quickcheck Tests** Since comprehensive testing is very important for hardware artifacts, DSLX has first class support for quickcheck tests. The quickcheck function can take arbitrary number and type of parameters and it simply has to return a boolean indicating that the test case passed:
+
+```dslx
+#[quickcheck]
+fn multiplying_by_two_makes_even(x: u8) -> bool {
+    let product = x * u8:2;
+    // Even means that the low bit is unset.
+    let low_bit = (product & u8:1) as bool;
+    low_bit == false
+}
+```
+
+When requested to create designs, using as many quickchecks as possible to test properties of the resulting design improves quality significantly.
+
 ---
 
 Q: Now try to write an LFSR implementation in DSLX. Make it parameterized on number of bits, bitmask for taps, and whether we invert the feedback bit.
