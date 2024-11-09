@@ -214,8 +214,6 @@ fn show_match() {
 }
 ```
 
-That is all of the tutorial content.
-
 **Quickcheck Tests** Since comprehensive testing is very important for hardware artifacts, DSLX has first class support for quickcheck tests. The quickcheck function can take arbitrary number and type of parameters and it simply has to return a boolean indicating that the test case passed:
 
 ```dslx
@@ -229,6 +227,10 @@ fn multiplying_by_two_makes_even(x: u8) -> bool {
 ```
 
 When requested to create designs, using as many quickchecks as possible to test properties of the resulting design improves quality significantly.
+
+For parameterized designs it's nice to use smaller types in our quickchecks so that exhaustive testing (or other means of proving) of the quickcheck property is more of a viable option.
+
+**That is all of the tutorial content.**
 
 ---
 
