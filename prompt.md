@@ -231,7 +231,7 @@ fn show_map() {
 fn show_match() {
     let my_tuple = (u32:42, u8:64);
     let result = match my_tuple {
-        (u32:42, _) => u32:42,  // _ is wildcard matcher
+        (u32:42, _) | (u32:64, _) => u32:42,  // `_` is wildcard matcher, `|` is alternate for patterns
         (first, u8:64) => {  // match expression can be a block
             first + u32:1
         },
