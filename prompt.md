@@ -265,5 +265,3 @@ For parameterized designs it's nice to use smaller types in our quickchecks so t
 **That is all of the tutorial content.**
 
 ---
-
-Q: Now try to write an LFSR implementation in DSLX. Make it parameterized on number of bits, bitmask for taps, and whether we invert the feedback bit.
