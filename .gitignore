@@ -1,2 +1,2 @@
-*.swp
+*.sw[opqrst]
 __pycache__

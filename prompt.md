@@ -38,6 +38,18 @@ fn show_width_slice() {
 }
 ```
 
+**Bit Concatenation** Since bitwise concatenation is common in hardware DSLX supports `++` as the bitwise concatenation operator:
+
+```dslx
+#[test]
+fn show_bitwise_concat() {
+    let x = u8:0xab;
+    let y = u16:0xcdef;
+    let z = u4:0x7;
+    assert_eq(x ++ y ++ z, u28:0xabcdef7)
+}
+```
+
 **Enums Require Underlying Width** Unlike in Rust in DSLX we have to note what the integer type underlying an enum is, and enums cannot be sum types as in Rust; in DSLX:
 
 ```dslx
