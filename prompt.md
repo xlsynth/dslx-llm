@@ -262,6 +262,17 @@ For parameterized designs it's nice to use smaller types in our quickchecks so t
 
 **Define-Before-Use in Modules** Similar to C, and unlike in Rust, in DSLX you must define things lexically in the file before you refer to them; there are *not* forward declarations or automatic discovery of subsequent definitions.
 
+**Strings are Constant U8 Arrays** Differently from Rust, more akin to C, string literals are implicitly `u8` arrays -- because they are sized they have no trailing nul byte:
+
+```dslx
+#[test]
+fn show_string_is_u8_array() {
+    let my_array: u8[5] = "hello";
+    let rev = array_rev(my_array);
+    assert_eq(rev, "olleh");
+}
+```
+
 **That is all of the tutorial content.**
 
 ---
