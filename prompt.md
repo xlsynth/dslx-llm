@@ -211,6 +211,18 @@ fn show_parameterized_type_constructors() {
 }
 ```
 
+To generalize `uN` and `sN` DSLX has a parameterized-signedness type constructor `xN`, which constructs a type via `xN[bool][u32]` where the boolean gives the signedness:
+
+```dslx
+fn f<S: bool, N: u32>(x: xN[S][N]) -> (bool, u32) { (S, N) }
+
+#[test]
+fn show_parametric_signedness() {
+    assert_eq(f(u7:0), (false, u32:7));
+    assert_eq(f(s3:0), (true, u32:3));
+}
+```
+
 **Map Built-In** The `map` built-in can map a function over every element in an array to produce the transformed array. Unlike in Rust, functions must be defined at module scope, and in define-before-use order -- there are no lambdas/closures:
 
 ```dslx

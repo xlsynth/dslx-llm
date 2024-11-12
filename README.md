@@ -19,3 +19,7 @@ To test the samples in the prompt Markdown:
 ```
 $ DSLX_STDLIB_PATH=$HOME/opt/xlsynth/latest/xls/dslx/stdlib/ pytest test_prompt.py
 ```
+
+## Ideas not yet added
+
+* Various hashers and PRNGs, e.g. `xoshiro256**` and similar.
