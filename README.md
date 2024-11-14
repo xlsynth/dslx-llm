@@ -10,6 +10,10 @@ Repository for LLM prompts and Q&A samples for the XLS Domain Specific Language
   sample prompt.
 * `samples/*.md`: sample prompts and acceptance tests that can cause an LLM
   response to be accepted/rejected for the associated prompt.
+* `test_prompt.py`: a `pytest` based test file that extracts all the DSLX code
+  blocks from the prompt and runs them against an interpreter binary to
+  determine that they all pass. This is useful to help ensure the prompt is
+  showing correct and complete examples as we add/expand its content.
 
 ## Making the case for DSLX over Verilog
 
