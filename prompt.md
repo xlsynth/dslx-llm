@@ -236,6 +236,10 @@ fn show_map() {
 }
 ```
 
+**No List Comprehensions** As in Rust, there are no list comprehensions in DSLX. Instead of list comprehensions you must use the `map` built-in or a `for` loop.
+
+**Fixed Sizes** The sizes of values are all fixed, although they may be parameterized; i.e. there is no "vector like" type that can be built up in a loop -- instead, the full sized type must be created up front and we can update slices of it, e.g. in a `for` loop.
+
 **Match Construct** Pattern matching in DSLX is similar to Rust's, it just supports a subset of patterns that Rust supports. Prefer to use match expressions instead of if/else ladders. Tuples and constants can notably be pattern matched on:
 
 ```dslx
