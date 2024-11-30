@@ -22,8 +22,9 @@ Some arguments in favor of LLMs targeting DSLX over the underlying Verilog:
 * **XLS as platform:** The DSL (DSLX) is a fairly lightweight layer on top of
   XLS IR. XLS IR provides a **platform** for analysis and transformation that
   is fully open source with fully defined semantics and equal representative
-  capabilities.  XLS lives "underneath" and completely understand the hardware
+  capabilities.  XLS lives "underneath" and completely understands the hardware
   computation descriptions, and is capable of **simulating them at naive speed**.
+  
   We can write and slot-in new analysis tools easily, and our understanding of
   the platform is complete -- this is a major challenge for all RTL toolchains
   and Verilog/SystemVerilog semantics in general, often the ones used in practice
