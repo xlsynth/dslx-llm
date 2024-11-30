@@ -19,18 +19,31 @@ Repository for LLM prompts and Q&A samples for the XLS Domain Specific Language
 
 Some arguments in favor of LLMs targeting DSLX over the underlying Verilog:
 
-* DSLX mimics Rust and so presumably gets a good amount of transferred
+* **XLS as platform:** The DSL (DSLX) is a fairly lightweight layer on top of
+  XLS IR. XLS IR provides a **platform** for analysis and transformation that
+  is fully open source with fully defined semantics and equal representative
+  capabilities.  XLS lives "underneath" and completely understand the hardware
+  computation descriptions, and is capable of **simulating them at naive speed**.
+  We can write and slot-in new analysis tools easily, and our understanding of
+  the platform is complete -- this is a major challenge for all RTL toolchains
+  and Verilog/SystemVerilog semantics in general, often the ones used in practice
+  are proprietary and the SystemVerilog support for fully open toolchains is
+  partial at best.
+* **Transfer learning from Rust and software:** DSLX mimics Rust and so
+  presumably gets a good amount of transferred
   understanding from LLM knowledge of function/program construction in the
   software domain.
-* DSLX functions are written as:
+* **Function-oriented for easy retargeting/composition:** DSLX functions are written as:
   * largely pure functions, with limited side effects and immutable values
   * with transparent dataflow semantics
   * and no undefined behavior,
   
-  and so can be verified easily and then can be retmined as pipelines (via XLS' scheduler)
-  or lifted into a recurrence in time (via `proc`s, for stateful evolution,
-  similar to reasoning about loops in turing complete languages).
-* Knowledge of how to write functions as effective building blocks from
+  and so can be **verified easily** and then can be **retmined as pipelines**
+  (via XLS' scheduler) or lifted into a recurrence in time (via `proc`s, for
+  stateful evolution (i.e. **generate a state machine**), similar to how we
+  reason about loops in turing complete languages).
+* **Not deep-inductive, tricky-state-space oriented:** Knowledge of how to
+  write functions as effective building blocks from
   software programming languages and associated program synthesis presumably
   side-steps some of the difficulty in learning Verilog semantics and challenges
   of structural and temporal composition.
@@ -45,10 +58,11 @@ In summary, targeting a slightly **higher level** and **more well defined** set
 of constructs that are **more semantically similar to software** should aid in
 the construction of **correct, robust hardware computation**.
 
-By analogy: we don't try to get LLMs to emit correct assembly from natural
-descriptions because they get an uplift from the higher level semantics in a
-similar fashion to how humans get a productivity, reasoning, and correctness
-uplift from the higher level languages we use.
+**By analogy to software High Level Languages:** we don't try to get LLMs to
+emit correct assembly from natural descriptions because they get an uplift from
+the higher level semantics in a similar fashion to how humans get a
+productivity, reasoning, and correctness uplift from the higher level languages
+we use.
 
 ## Developer Tips
 
