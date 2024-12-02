@@ -84,3 +84,4 @@ $ DSLX_STDLIB_PATH=$HOME/opt/xlsynth/latest/xls/dslx/stdlib/ pytest test_prompt.
 ## Ideas not yet added
 
 * Various hashers and PRNGs, e.g. `xoshiro256**` and similar.
+* More arbiters: LRU, round robin, hierarchical round robin (via composition).
