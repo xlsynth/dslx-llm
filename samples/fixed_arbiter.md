@@ -21,6 +21,26 @@ fn fixed_arbiter<N: u32>(requests: bits[N], state: ArbiterState<N>) -> (bits[N],
 ```dslx
 import std;
 
+#[test]
+fn test_fixed_arbiter() {
+  let state = ArbiterState<u32:4>{};
+  
+  // Test case 1: requestors 1 and 3 are requesting
+  let requests = bits[4]:0b1010;
+  let (grant, state) = fixed_arbiter(requests, state);
+  assert_eq(grant, bits[4]:0b0010);  // requestor 1 should be granted
+
+  // Test case 2: requestors 0 and 2 are requesting
+  let requests2 = bits[4]:0b0101;
+  let (grant2, state) = fixed_arbiter(requests2, state);
+  assert_eq(grant2, bits[4]:0b0001);  // requestor 0 should be granted
+
+  // Test case 3: no requestors are requesting
+  let requests3 = bits[4]:0b0000;
+  let (grant3, state) = fixed_arbiter(requests3, state);
+  assert_eq(grant3, bits[4]:0b0000);  // no grant should be issued
+}
+
 /// Returns true iff we gave a grant an index where req was true.
 fn granted_at_requested_index<N: u32>(req: bits[N], grant: bits[N]) -> bool {
   let (found, index) = std::find_index(std::convert_to_bools_lsb0(grant), true);
