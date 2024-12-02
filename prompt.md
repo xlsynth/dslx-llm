@@ -289,6 +289,8 @@ fn show_string_is_u8_array() {
 }
 ```
 
+**Helpful-only guidance:** If you're unsure what the type of a particular sub-expression is, it can be useful to break the nested expression up into multiple expressions to help get early/explicit guidance on whether the type was as you were expecting. This can be particularly useful for parametric code.
+
 **That is all of the tutorial content.**
 
 ---

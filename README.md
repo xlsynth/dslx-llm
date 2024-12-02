@@ -54,6 +54,14 @@ Some arguments in favor of LLMs targeting DSLX over the underlying Verilog:
     humans to understand and use correctly, in addition to a slew of
     "best practices" required to avoid [traps around 4-value
     semantics](http://www.sunburst-design.com/papers/CummingsSNUG1999Boston_FullParallelCase_rev1_1.pdf). 
+* **Straightforwardly composable primitives (i.e. libraries work):**
+  the DSL has a standard library of functions that can be composed without fear
+  of correctness errors due to the latency-insensitive nature of the design
+  descriptions. As more standard library functions are built/offered, and more
+  "batteries included" modules are created, LLMs will be able to leverage
+  straightforward notions of composition from a more powerful basis.
+  Composition is more challenging in a timed and transition-based programming
+  model.
 
 In summary, targeting a slightly **higher level** and **more well defined** set
 of constructs that are **more semantically similar to software** should aid in
