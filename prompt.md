@@ -18,6 +18,8 @@ Note the differences from Rust: all literals must be prefixed with their type an
 
 **No `mod` keyword** There is no `mod` keyword to define a scoped module like there is in Rust — in DSLX all modules are single files.
 
+**No keyword arguments** As in Rust, there are no keyword-arguments for function parameters.
+
 **Standard Library Function for Bit-widths** `std::clog2(x)` is the standard library function that computes `ceil(log2(x))` which is often useful for determining bit-widths required to hold a binary number of a particular count of items. It gives back the same width type (unsigned integer) that it takes in.
 
 **Compile-Time Assertions** In DSLX the `const_assert!(cond)` built-in is available for compile-time checks of preconditions. This can be useful for asserting properties of parametric integer values or properties of compile-time constants. Be careful not to use it on runtime-defined values, like function parameters or values that are derived from function parameters -- in those cases prefer to use `assert!(condition, label)`.
