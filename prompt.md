@@ -22,7 +22,11 @@ Note the differences from Rust: all literals must be prefixed with their type an
 
 **Compile-Time Assertions** In DSLX the `const_assert!(cond)` built-in is available for compile-time checks of preconditions. This can be useful for asserting properties of parametric integer values or properties of compile-time constants. Be careful not to use it on runtime-defined values, like function parameters or values that are derived from function parameters -- in those cases prefer to use `assert!(condition, label)`.
 
-**Width Slices** To slice bits out of a value in DSLX there is a "width slice" syntax that extracts some number of bits (given by a type) from a given starting position in the value -- note that the starting position may be dynamic:
+**Width Slices** To slice bits out of a value in DSLX there is a "width slice" syntax that extracts some number of bits (given by a type) from a given starting position in the value; i.e. `$SUBJECT_EXPR[$START_EXPR +: $BIT_TYPE]` -- note:
+
+* the starting position may be dynamic
+* the width is given as a type, *not* as a number (this is different from Verilog)
+* the result type of the width-slice expression is the type given after the `+:`
 
 ```dslx
 #[test]
@@ -286,6 +290,20 @@ fn show_string_is_u8_array() {
     let my_array: u8[5] = "hello";
     let rev = array_rev(my_array);
     assert_eq(rev, "olleh");
+}
+```
+
+**Numeric Limits** Numeric limits are available as attributes of bit types:
+
+```dslx
+#[test]
+fn show_numeric_limits() {
+    assert_eq(u4::MAX, u4:0xf);
+    assert_eq(u4::ZERO, u4:0);
+    assert_eq(u4::MIN, u4:0);
+    assert_eq(s4::MAX, s4:0x7);
+    assert_eq(s4::ZERO, s4:0);
+    assert_eq(s4::MIN, s4:-8);
 }
 ```
 
