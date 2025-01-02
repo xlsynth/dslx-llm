@@ -44,6 +44,22 @@ fn show_width_slice() {
 }
 ```
 
+**Bitwise Negation** The syntax to invert all the bits in a value is the same as in Rust, `!` is used instead of the tilde operator used in C:
+
+```dslx
+#[test]
+fn show_bitwise_negate() {
+    let x0 = u8:0xff;
+    assert_eq(!x0, u8:0);
+
+    let x1 = s8:-1;
+    assert_eq(!x1, s8:0);
+
+    let b = false;
+    assert_eq(!b, true);
+}
+```
+
 **Bit Concatenation** Since bitwise concatenation is common in hardware DSLX supports `++` as the bitwise concatenation operator:
 
 ```dslx
