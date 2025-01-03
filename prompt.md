@@ -60,6 +60,21 @@ fn show_bitwise_negate() {
 }
 ```
 
+**Bitwise Reduction Built-Ins** There are built-in functions available in all modules for bitwise reductions: `or_reduce`, `and_reduce`, `xor_reduce` -- these do not need to be defined by the user, and they are parameterized on bitwidth:
+
+```dslx
+#[test]
+fn show_bitwise_reduction_builtins() {
+    assert_eq(or_reduce(u3:0b001), true);
+    assert_eq(or_reduce(u3:0b000), false);
+    assert_eq(or_reduce(u2:0b01), true);
+    assert_eq(and_reduce(u3:0b111), true);
+    assert_eq(and_reduce(u3:0b110), false);
+    assert_eq(xor_reduce(u3:0b111), true);
+    assert_eq(xor_reduce(u3:0b000), false);
+}
+```
+
 **Bit Concatenation** Since bitwise concatenation is common in hardware DSLX supports `++` as the bitwise concatenation operator:
 
 ```dslx
