@@ -44,6 +44,18 @@ fn show_width_slice() {
 }
 ```
 
+**Bit Indexing via Width Slices** In DSLX accessing a single bit is done via a width slice; i.e. `x[$START_EXPR +: u1]` -- this is unlike Verilog:
+
+```dslx
+#[test]
+fn show_bit_indexing() {
+    let x = u3:0b001;
+    assert_eq(x[0 +: u1], true);
+    assert_eq(x[1 +: u1], false);
+    assert_eq(x[2 +: u1], false);
+}
+```
+
 **Bitwise Negation** The syntax to invert all the bits in a value is the same as in Rust, `!` is used instead of the tilde operator used in C:
 
 ```dslx
