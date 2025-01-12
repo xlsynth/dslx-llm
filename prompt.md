@@ -206,19 +206,21 @@ As a brief reminder of the Rust rules, if you extend an signed source number, a 
 
 ```dslx
 #[test]
-fn show_signed_source_extension_semantics() {
+fn show_signed_source_extension_is_sign_extension() {
     let original_signed = s4:-1;
     assert_eq(original_signed as s6, s6:-1);
     assert_eq(original_signed as u6, u6:0x3f);
 }
 
 #[test]
-fn show_unsigned_source_extension_semantics() {
+fn show_unsigned_source_extension_is_zero_extension() {
     let original_unsigned = u4:0xf;
     assert_eq(original_unsigned as s6, s6:0xf);
     assert_eq(original_unsigned as u6, u6:0xf);
 }
 ```
+
+To reiterate: there is never any reason to define a helper function like `zero_extend` or `sign_extend` in DSLX, just use the `as` cast operator -- if the source type is unsigned it will zero extend, and if the source type is signed it will sign extend.
 
 **Parameterized Functions** Parameterized functions in DSLX are similar to, but more powerful than, const generics in Rust. Parameterization in DSLX can do fairly arbitrary computation, and the syntax is shaped like so — note that any “derived parametric” values where we compute them based on other parametrics syntactically have their expressions in curls:
 
