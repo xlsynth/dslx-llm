@@ -22,6 +22,16 @@ Note the differences from Rust: all literals must be prefixed with their type an
 
 **Standard Library Function for Bit-widths** `std::clog2(x)` is the standard library function that computes `ceil(log2(x))` which is often useful for determining bit-widths required to hold a binary number of a particular count of items. It gives back the same width type (unsigned integer) that it takes in.
 
+**Built-in Functions for Leading/Trailing Zeros** The built-in function to count the number of leading zeros is `clz` and for trailing zeros is `ctz`:
+
+```dslx
+#[test]
+fn show_clz_ctz_builtins() {
+    assert_eq(clz(u8:0x01), u8:7);
+    assert_eq(ctz(u8:0x02), u8:1);
+}
+```
+
 **Compile-Time Assertions** In DSLX the `const_assert!(cond)` built-in is available for compile-time checks of preconditions. This can be useful for asserting properties of parametric integer values or properties of compile-time constants. Be careful not to use it on runtime-defined values, like function parameters or values that are derived from function parameters -- in those cases prefer to use `assert!(condition, label)`.
 
 **Width Slices** To slice bits out of a value in DSLX there is a "width slice" syntax that extracts some number of bits (given by a type) from a given starting position in the value; i.e. `$SUBJECT_EXPR[$START_EXPR +: $BIT_TYPE]` -- note:
