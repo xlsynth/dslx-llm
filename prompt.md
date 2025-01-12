@@ -18,9 +18,30 @@ Note the differences from Rust: all literals must be prefixed with their type an
 
 **No `mod` keyword** There is no `mod` keyword to define a scoped module like there is in Rust — in DSLX all modules are single files.
 
+**No early return** There is no `return` keyword support in DSLX, instead the last expression in a function is the return value (as in Rust). The reasoning for this is that, in circuit design, early returns are creating a top level mux, and it is better to see this structurally in the code. Sometimes to peel off special cases a helper function will be used; i.e.
+
+```dslx
+import float32;
+
+// Can assume x is non-zero.
+fn int_to_float_nz(x: s32) -> float32::F32 {
+    fail!("todo_nz_case", float32::zero(false))
+}
+
+pub fn int_to_float(x: s32) -> float32::F32 {
+    if x == s32:0 {
+        let sign_bit = false;
+        float32::F32 { sign: sign_bit, bexp: u8:0, fraction: u23:0 }
+    } else {
+        // Call helper function.
+        int_to_float_nz(x)
+    }
+}
+```
+
 **No keyword arguments** As in Rust, there are no keyword-arguments for function parameters.
 
-**Standard Library Function for Bit-widths** `std::clog2(x)` is the standard library function that computes `ceil(log2(x))` which is often useful for determining bit-widths required to hold a binary number of a particular count of items. It gives back the same width type (unsigned integer) that it takes in.
+**Standard Library Function for Bit-widths** `std::clog2(x)` is the standard library function that computes `ceil(log2(x))` which is often useful for determining bit-widths required to hold a binary number of a particular count of items. It gives back the same width type (unsigned integer) that it takes in. Analogously there is also a standard library function `std::flog2(x)` that computes `floor(log2(x))`.
 
 **Built-in Functions for Leading/Trailing Zeros** The built-in function to count the number of leading zeros is `clz` and for trailing zeros is `ctz`:
 
