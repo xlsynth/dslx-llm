@@ -99,6 +99,8 @@ fn show_bitwise_concat() {
 }
 ```
 
+Note that DSLX code will typically prefer to use the `++` operator instead of the C-style pattern of `x << shift_amount | y` because it is more correct by construction.
+
 **Enums Require Underlying Width** Unlike in Rust in DSLX we have to note what the integer type underlying an enum is, and enums cannot be sum types as in Rust; in DSLX:
 
 ```dslx
