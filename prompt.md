@@ -168,14 +168,21 @@ fn show_2d_indexing() {
 }
 ```
 
-**Immutable Array Updates** All values are immutable in DSLX, there is no `let mut` as there is in Rust. As a result, immutable arrays are updated via the `update` builtin:
+**Immutable Array Updates** All values are immutable in DSLX, there is no `let mut` as there is in Rust. As a result, immutable arrays are updated via the `update` builtin -- the elements can be any type:
 
 ```dslx
+struct MyStruct { my_field: u8 }
+
 #[test]
 fn show_array_update() {
     let a = u8[3]:[1, 2, 3];
     let b: u8[3] = update(a, u32:1, u8:7); // update index `1` to be value `u8:7`
-    assert_eq(b, u8[3]:[1, 7, 3])
+    assert_eq(b, u8[3]:[1, 7, 3]);
+
+    // It works on struct elements and other types as well.
+    let aos = MyStruct[3]:[MyStruct { my_field: u8:1 }, MyStruct { my_field: u8:2 }, MyStruct { my_field: u8:3 }];
+    let aos' = update(aos, u32:1, MyStruct { my_field: u8:7 });
+    assert_eq(aos', MyStruct[3]:[MyStruct { my_field: u8:1 }, MyStruct { my_field: u8:7 }, MyStruct { my_field: u8:3 }]);
 }
 ```
 
