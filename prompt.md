@@ -138,7 +138,25 @@ Note that DSLX code will typically prefer to use the `++` operator instead of th
 enum MyEnum: u8 { A = 0, B = 7, C = 255 }
 ```
 
-**Array Type Syntax** Array types are written with different syntax from Rust; in Rust we’d write `[u8; 4]` but in DSLX we write `u8[4]`.
+**Array Type Syntax** Array types are written with different syntax from Rust; in Rust we’d write `[u8; 4]` but in DSLX we write `u8[4]`. There no unsized arrays or slices in DSLX, you must know the size of all arrays at compile time; example:
+
+```dslx
+// Sums the elements of an array with parameterized element count `N`.
+fn sum_to_u16<N: u32>(a: u8[N]) -> u16 {
+    let init = u16:0;
+    let result: u16 = for (elem, accum) in a {
+        let updated = accum + elem as u16;
+        updated
+    }(init);
+    result
+}
+
+#[test]
+fn test_sum_to_u16() {
+    let a = u8[4]:[1, 2, 3, 4];
+    assert_eq(sum_to_u16(a), u16:10);
+}
+```
 
 **Multi-Dimensional Array Types and Indexing** For multi-dimensional arrays in Rust we’d write `[[u8; 4]; 2]` but in DSLX we write `u8[4][2]`. Note **very well** that the `2` is the first dimension indexed in that DSLX type! Which is to say, the indexing works similarly to Rust, we index the outer array before indexing the inner array; i.e. we index the `2` dimension and we get a `u8[4]` and we can subsequently index that to get a single `u8`. Don't be fooled by the fact it looks more like C syntax, the first dimension written in the multi-dimensional array type is not the first dimension indexed.
 
@@ -282,7 +300,7 @@ fn show_parametric_widen_2x_explicit() {
 }
 ```
 
-**Constructing Parameterized Types** It's common to want to construct an type with a number of bits based on a compile-time constant value. `uN` is the unsigned bits type constructor, and `sN` is the signed bits type constructor -- they can be instantiated with a literal value or a constant name or simple expressions. It is often most readable to instantiate them using a named constant:
+**Constructing Parameterized Types** It's common to want to construct an type with a number of bits based on a compile-time constant value. `uN` is the unsigned bits type constructor (it it is the same as the `bits` keyword for historical reasons), and `sN` is the signed bits type constructor -- they can be instantiated with a literal value or a constant name or simple expressions. It is often most readable to instantiate them using a named constant:
 
 ```dslx
 #[test]
