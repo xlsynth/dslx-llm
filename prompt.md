@@ -186,6 +186,57 @@ fn show_array_update() {
 }
 ```
 
+**No Mutation, Even In Control Flow Blocks** Another consequence of `mut` not being available in DSLX in that you must use balanced control flow to calculate updated values, you cannot mutate a variable in the enclosing scope. Instead of code like:
+
+```rust
+let mut fraction = fraction_trunc;
+if should_round_up {
+    let new_fraction = fraction + u15::1;
+    if new_fraction < fraction {
+        fraction = u15::0;
+        let new_exp = exponent + u8::1;
+        if new_exp <= exponent {
+            exponent = u8::0xff;
+        } else {
+            exponent = new_exp;
+        }
+    } else {
+        fraction = new_fraction;
+    }
+}
+```
+
+You use expression-based dataflow that converges to produce updated values like the following:
+
+```dslx
+fn f(fraction_trunc: u15, exponent: u8, should_round_up: bool) -> (u15, u8) {
+    let (fraction, exponent) = if should_round_up {
+        let new_fraction = fraction_trunc + u15:1;
+
+        if new_fraction < fraction_trunc {
+            let new_exp = exponent + u8:1;
+            if new_exp <= exponent {
+                (u15:0, u8:0xff)
+            } else {
+                (u15:0, new_exp)
+            }
+        } else {
+            (new_fraction, exponent)
+        }
+    } else {
+        (fraction_trunc, exponent)
+    };
+    (fraction, exponent)
+}
+
+#[test]
+fn test_f() {
+    let (fraction, exponent) = f(u15::MAX, u8::MAX, true);
+    assert_eq(fraction, u15:0);
+    assert_eq(exponent, u8:0xff);
+}
+```
+
 **Repeated Array Elements Shorthand** Since it is commonly needed, in DSLX there is a shorthand for repeating an element to fill the remainder of an array:
 
 ```dslx

@@ -4,7 +4,10 @@ import os
 import re
 import tempfile
 import subprocess
+import sys
+
 import pytest
+import tiktoken
 
 MD_FILE = 'prompt.md'
 
@@ -44,3 +47,18 @@ def test_dslx_code_sample(code_sample):
         )
     finally:
         os.remove(tmp_filename)
+
+
+def test_prompt_size():
+    """Tests tokens in prompt to check fit in context window."""
+    encoding = tiktoken.encoding_for_model('gpt-4-turbo')
+
+    # Read the file
+    with open(MD_FILE, 'r', encoding='utf-8') as f:
+        text = f.read()
+
+    token_count = len(encoding.encode(text))
+    print('token count:', token_count, file=sys.stderr)
+
+    # Check we stay comfortably within a reasonable context window.
+    assert token_count <= 8 * 1024
