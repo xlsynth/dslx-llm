@@ -62,8 +62,6 @@ fn quickcheck_gray_code_is_unique(a: u8, b: u8) -> bool {
     }
 }
 
-import std;
-
 // 1) Round-trip binary → gray → binary
 #[quickcheck]
 fn qc_roundtrip_binary_gray(x: u8) -> bool {

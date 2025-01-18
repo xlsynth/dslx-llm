@@ -19,8 +19,6 @@ fn fixed_arbiter<N: u32>(requests: bits[N], state: ArbiterState<N>) -> (bits[N],
 ## Tests
 
 ```dslx
-import std;
-
 #[test]
 fn test_fixed_arbiter() {
   let state = ArbiterState<u32:4>{};

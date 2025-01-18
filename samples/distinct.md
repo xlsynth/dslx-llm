@@ -23,21 +23,21 @@ fn test_simple_nondistinct() {
 fn test_distinct_unsigned() {
     let items = u8[4]:[1, 2, 3, 2];
     let valid = bool[4]:[true, true, true, true];
-    assert_eq(distinct<4, 8, false>(items, valid), false);
+    assert_eq(distinct<u32:4, u32:8, false>(items, valid), false);
 }
 
 #[test]
 fn test_distinct_signed() {
     let items = s8[3]:[-1, 0, 1];
     let valid = bool[3]:[true, true, true];
-    assert_eq(distinct<3, 8, true>(items as bits[8][3], valid), true);
+    assert_eq(distinct<u32:3, u32:8, true>(items as bits[8][3], valid), true);
 }
 
 #[test]
 fn test_distinct_with_invalid() {
     let items = u8[4]:[1, 2, 3, 1];
     let valid = bool[4]:[true, true, true, false];
-    assert_eq(distinct<4, 8, false>(items, valid), true);
+    assert_eq(distinct<u32:4, u32:8, false>(items, valid), true);
 }
 
 #[quickcheck]
