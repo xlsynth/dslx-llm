@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
+import dataclasses
 import optparse
 import os
 import subprocess
@@ -86,10 +87,20 @@ class CodeGenerator:
 def strip_fences(text):
     text = text.strip()
     if text.startswith('```'):
-        text = '\n'.join(text.splitlines()[1:-1])
+        lines = text.splitlines()
+        assert lines[-1] == '```'
+        text = '\n'.join(lines[1:-1])
     return text
 
-def run_dslx_tests(generated_code, test_cases, sample_filename, tmpdir):
+@dataclasses.dataclass
+class RunResult:
+    command: str
+    success: bool
+    retcode: int
+    stdout: str
+    stderr: str
+
+def run_dslx_tests(generated_code: str, test_cases: str, sample_filename: str, tmpdir: str) -> RunResult:
     """Run DSLX tests using the interpreter."""
     prologue_lines = []
     if 'import std;' not in generated_code:
@@ -100,16 +111,18 @@ def run_dslx_tests(generated_code, test_cases, sample_filename, tmpdir):
     with open(x_path, "w") as f:
         f.write(full_code)
 
+    cmd = [DSLX_INTERPRETER, x_path, '--dslx_stdlib_path', DSLX_STDLIB_PATH, '--compare=jit']
     result = subprocess.run(
-        [DSLX_INTERPRETER, x_path, '--dslx_stdlib_path', DSLX_STDLIB_PATH, '--compare=jit'],
+        cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
     success = result.returncode == 0
-    return success, result.stdout if success else result.stderr
+    command = subprocess.list2cmdline(cmd)
+    return RunResult(command, success, result.returncode, result.stdout, result.stderr)
 
-def evaluate_sample(sample_path, model, max_retries):
+def evaluate_sample(sample_path: str, model: str, max_retries: int) -> tuple[bool, bool]:
     """Evaluate a single sample."""
     _, sample_filename = os.path.split(sample_path)
     sample_filename, _ = os.path.splitext(sample_filename)
@@ -133,20 +146,27 @@ def evaluate_sample(sample_path, model, max_retries):
             termcolor.cprint('<<EOF', color='blue')
             print(generated_code)
             termcolor.cprint('EOF', color='blue')
-            success, result = run_dslx_tests(generated_code, tests, f'{sample_filename}-attempt-{attempt}', tmpdir)
+            run_result = run_dslx_tests(generated_code, tests, f'{sample_filename}-attempt-{attempt}', tmpdir)
 
             # Write out results to the tmpdir as well.
-            with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-result-success-{success}.txt'), 'w') as f:
-                f.write(result)
+            with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-result-retcode.txt'), 'w') as f:
+                print(run_result.retcode, file=f)
+            with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-result-stdout.txt'), 'w') as f:
+                f.write(run_result.stdout)
+            with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-result-stderr.txt'), 'w') as f:
+                f.write(run_result.stderr)
 
-            if success:
+            if run_result.success:
                 print(f"✅ Success on attempt {attempt}")
                 if attempt == 1:
                     first_attempt_success = True
                 return True, first_attempt_success
 
-            print(f"❌ Error on attempt {attempt}: {result}")
-            feedback_from_last_iteration = result
+            print(f"❌ Error on attempt {attempt}; command: {run_result.command}")
+            termcolor.cprint('<<EOF', color='blue')
+            print(run_result.stderr, end='')
+            termcolor.cprint('EOF', color='blue')
+            feedback_from_last_iteration = run_result.stderr
 
     print("❌ All attempts failed.")
     return False, first_attempt_success
