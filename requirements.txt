@@ -1,0 +1,5 @@
+tiktoken==0.8.0
+mypy==1.14.1
+pytest==8.3.4
+openai==1.59.8
+termcolor==2.5.0
