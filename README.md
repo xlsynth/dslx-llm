@@ -24,7 +24,7 @@ Some arguments in favor of LLMs targeting DSLX over the underlying Verilog:
   is fully open source with fully defined semantics and equal representative
   capabilities.  XLS lives "underneath" and completely understands the hardware
   computation descriptions, and is capable of **simulating them at naive speed**.
-  
+
   We can write and slot-in new analysis tools easily, and our understanding of
   the platform is complete -- this is a major challenge for all RTL toolchains
   and Verilog/SystemVerilog semantics in general, often the ones used in practice
@@ -38,7 +38,7 @@ Some arguments in favor of LLMs targeting DSLX over the underlying Verilog:
   * largely pure functions, with limited side effects and immutable values
   * with transparent dataflow semantics
   * and no undefined behavior,
-  
+
   and so can be **verified easily** and then can be **retmined as pipelines**
   (via XLS' scheduler) or lifted into a recurrence in time (via `proc`s, for
   stateful evolution (i.e. **generate a state machine**), similar to how we
@@ -53,7 +53,7 @@ Some arguments in favor of LLMs targeting DSLX over the underlying Verilog:
     Type promotion and matching in expressions is even difficult for expert
     humans to understand and use correctly, in addition to a slew of
     "best practices" required to avoid [traps around 4-value
-    semantics](http://www.sunburst-design.com/papers/CummingsSNUG1999Boston_FullParallelCase_rev1_1.pdf). 
+    semantics](http://www.sunburst-design.com/papers/CummingsSNUG1999Boston_FullParallelCase_rev1_1.pdf).
 * **Straightforwardly composable primitives (i.e. libraries work):**
   the DSL has a standard library of functions that can be composed without fear
   of correctness errors due to the latency-insensitive nature of the design
