@@ -58,3 +58,7 @@ jobs:
         run: |
           pre-commit install
           pre-commit run --all-files
+
+      - name: Run pytest  # Avoid relying on the pre-commit hook stage.
+        run: |
+          pytest test_prompt.py
