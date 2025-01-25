@@ -65,16 +65,17 @@ Some arguments in favor of LLMs targeting DSLX over the underlying Verilog:
     humans to understand and use correctly, in addition to a slew of
     "best practices" required to avoid [traps around 4-value
     semantics](http://www.sunburst-design.com/papers/CummingsSNUG1999Boston_FullParallelCase_rev1_1.pdf).
-  * Verilog tools often have platform-defined but
-    **cross-platform-specification-undefined** behavior -- i.e. behavior that
-    is not fully defined by the specification, but that will coincidentally have
-    some semantics for a given tool. This is abundant as a language becomes
-    less fully-specified.  Overfitting for the observed behavior of a single
-    tool and believing it is specified due to empirical observations is a
-    natural trap. "Transfer learning" from the observed semantics of one tool
-    to expectations of what another tool will do is tempting, but will likely
-    lead to incorrect results due to well-defined vs single-platform-defined
-    semantics confusion.
+  * Verilog tools often have implementation-defined but
+    **cross-implementation-undefined / specification-undefined** behavior --
+    i.e. behavior that is not fully defined by the specification, but that will
+    coincidentally have some semantics for a given tool. This is abundant as a
+    language becomes less fully-specified.
+
+    Overfitting for the observed behavior of a single tool and believing it is
+    specified due to empirical observations is a natural trap. "Transfer
+    learning" from the observed semantics of one tool to expectations of what
+    another tool will do is tempting, but will likely lead to incorrect results
+    due to well-defined vs implementation-defined semantics confusion.
 * **Straightforwardly composable primitives (i.e. libraries work):**
   the DSL has a standard library of functions that can be composed without fear
   of correctness errors due to the latency-insensitive nature of the design
