@@ -132,6 +132,18 @@ fn show_bitwise_concat() {
 
 Note that DSLX code will typically prefer to use the `++` operator instead of the C-style pattern of `x << Y_BITS | y` because it is more correct by construction.
 
+**Shift Amounts Must Be Unsigned** The language does not permit signed shift amounts because it's unclear what a possibly-negative shift would mean in hardware, all shift amounts must be unsigned:
+
+```dslx
+#[test]
+fn show_shifts() {
+    let x = u8:0xab;
+    let y = u32:4;  // Note: unsigned value.
+    assert_eq(x >> y, u8:0xa);
+    assert_eq(x << y, u8:0xb0);
+}
+```
+
 **Enums Require Underlying Width** Unlike in Rust in DSLX we have to note what the integer type underlying an enum is, and enums cannot be sum types as in Rust; in DSLX:
 
 ```dslx
@@ -460,6 +472,21 @@ fn show_numeric_limits() {
     assert_eq(s4::MAX, s4:0x7);
     assert_eq(s4::ZERO, s4:0);
     assert_eq(s4::MIN, s4:-8);
+
+}
+```
+
+Note: there is currently a DSLX grammar restriction where we cannot write `uN[N]::MAX` directly, so we need to write a type alias like so:
+
+```dslx
+const N = u32:4;
+
+#[test]
+fn show_numeric_limits_uN_N() {
+    // does not work: uN[N]::MAX
+    // does work:
+    type MyUN = uN[N];
+    assert_eq(MyUN::MAX, u4:0xf)
 }
 ```
 
