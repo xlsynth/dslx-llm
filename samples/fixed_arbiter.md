@@ -22,7 +22,7 @@ fn fixed_arbiter<N: u32>(requests: bits[N], state: ArbiterState<N>) -> (bits[N],
 #[test]
 fn test_fixed_arbiter() {
   let state = ArbiterState<u32:4>{};
-  
+
   // Test case 1: requestors 1 and 3 are requesting
   let requests = bits[4]:0b1010;
   let (grant, state) = fixed_arbiter(requests, state);

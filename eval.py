@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import dataclasses
+import difflib
 import optparse
 import os
 import subprocess
@@ -26,6 +27,20 @@ def load_system_prompt():
     return system_prompt
 
 SYSTEM_PROMPT = load_system_prompt()
+
+def print_color_diff(text1: str, text2: str) -> None:
+    d = difflib.Differ()
+    diff = list(d.compare(text1.splitlines(), text2.splitlines()))
+
+    for line in diff:
+        if line.startswith("+ "):  # Added lines
+            print(termcolor.colored(line, "green"))
+        elif line.startswith("- "):  # Removed lines
+            print(termcolor.colored(line, "red"))
+        elif line.startswith("? "):  # Contextual hints
+            print(termcolor.colored(line, "yellow"))
+        else:  # Unchanged lines
+            print(line)
 
 def parse_sample(file_path):
     """Parse the sample file to extract the prompt, signature, and tests."""
@@ -134,6 +149,8 @@ def evaluate_sample(sample_path: str, model: str, max_retries: int) -> tuple[boo
     with tempfile.TemporaryDirectory(suffix=f'-{model}-{sample_filename}', delete=False) as tmpdir:
         print('tmpdir:', tmpdir)
 
+        all_generated = []
+
         feedback_from_last_iteration = None
         first_attempt_success = False
         for attempt in range(1, max_retries + 1):
@@ -143,9 +160,17 @@ def evaluate_sample(sample_path: str, model: str, max_retries: int) -> tuple[boo
             else:
                 generated_code = codegen.generate_code(prompt, signature)
 
-            termcolor.cprint('<<EOF', color='blue')
+            all_generated.append(generated_code)
+
+            termcolor.cprint('<<GENERATED', color='blue')
             print(generated_code)
-            termcolor.cprint('EOF', color='blue')
+            termcolor.cprint('GENERATED', color='blue')
+
+            if len(all_generated) >= 2:
+                termcolor.cprint('<<DIFF', color='blue')
+                print_color_diff(all_generated[-2], all_generated[-1])
+                termcolor.cprint('DIFF', color='blue')
+
             run_result = run_dslx_tests(generated_code, tests, f'{sample_filename}-attempt-{attempt}', tmpdir)
 
             # Write out results to the tmpdir as well.
@@ -163,9 +188,11 @@ def evaluate_sample(sample_path: str, model: str, max_retries: int) -> tuple[boo
                 return True, first_attempt_success
 
             print(f"❌ Error on attempt {attempt}; command: {run_result.command}")
-            termcolor.cprint('<<EOF', color='blue')
+
+            termcolor.cprint('<<OUTPUT', color='blue')
             print(run_result.stderr, end='')
-            termcolor.cprint('EOF', color='blue')
+            termcolor.cprint('OUTPUT', color='blue')
+
             feedback_from_last_iteration = run_result.stderr
 
     print("❌ All attempts failed.")
@@ -176,8 +203,10 @@ def get_sample_choices():
 
 def main():
     """Main function to evaluate all samples."""
+    MODEL_CHOICES = ['gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o1-preview']
+
     parser = optparse.OptionParser()
-    parser.add_option('--model', default=None, choices=['gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o1-preview'])
+    parser.add_option('--model', default=None, choices=MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(MODEL_CHOICES))
     parser.add_option('--sample', default=None, choices=get_sample_choices())
     parser.add_option('--max-retries', default=3, type=int)
     opts, args = parser.parse_args()
