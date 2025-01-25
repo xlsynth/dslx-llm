@@ -14,6 +14,17 @@ Repository for LLM prompts and Q&A samples for the XLS Domain Specific Language
   blocks from the prompt and runs them against an interpreter binary to
   determine that they all pass. This is useful to help ensure the prompt is
   showing correct and complete examples as we add/expand its content.
+* `eval.py`: feeds the system prompt and sample prompt(s) to a model API and
+  tests them against the acceptance tests, feeding back any errors that occur
+  up to a max retry count. Emits a scorecard at the end as a success indicator.
+
+To run eval on a specific sample:
+
+```sh
+export OPENAI_API_KEY=""  # replace with your key
+export DSLX_STDLIB_PATH=""  # replace with DSLX stdlib path
+python eval.py --model gpt-3.5-turbo --sample saturating_addsub --max-retries 5
+```
 
 ## Making the case for DSLX over Verilog
 
