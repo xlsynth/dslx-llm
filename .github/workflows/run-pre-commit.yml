@@ -24,7 +24,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Fetch latest XLSynth release
+        id: fetch-xlsynth
+        run: |
+          API_URL="https://api.github.com/repos/xlsynth/xlsynth/releases/latest"
+          RESPONSE=$(curl -s $API_URL)
+          BINARY_URL=$(echo $RESPONSE | jq -r '.assets[] | select(.name == "dslx_interpreter_main-ubuntu2204") | .browser_download_url')
+          STDLIB_URL=$(echo $RESPONSE | jq -r '.assets[] | select(.name == "dslx_stdlib.tar.gz") | .browser_download_url')
+          if [ -z "$BINARY_URL" ] || [ -z "$STDLIB_URL" ]; then
+            echo "Error: Could not find required assets in the latest release." >&2
+            exit 1
+          fi
+          echo "BINARY_URL=$BINARY_URL" >> $GITHUB_ENV
+          echo "STDLIB_URL=$STDLIB_URL" >> $GITHUB_ENV
+
+      - name: Download DSLX interpreter binary
+        run: |
+          curl -L "$BINARY_URL" -o dslx_interpreter_main
+          chmod +x dslx_interpreter_main
+
+      - name: Download and extract DSLX standard library
+        run: |
+          curl -L "$STDLIB_URL" -o dslx_stdlib.tar.gz
+          tar -xzf dslx_stdlib.tar.gz
+          export DSLX_STDLIB_PATH=$PWD/xls/dslx/stdlib
+          echo "DSLX_STDLIB_PATH=$PWD/xls/dslx/stdlib" >> $GITHUB_ENV
+
       - name: Run pre-commit hooks
+        env:
+          DSLX_STDLIB_PATH: ${{ env.DSLX_STDLIB_PATH }}
         run: |
           pre-commit install
           pre-commit run --all-files
