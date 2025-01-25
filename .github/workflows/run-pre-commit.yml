@@ -42,6 +42,8 @@ jobs:
         run: |
           curl -L "$BINARY_URL" -o dslx_interpreter_main
           chmod +x dslx_interpreter_main
+          export PATH="$PWD:$PATH"
+          echo "PATH=$PWD:$PATH" >> $GITHUB_ENV
 
       - name: Download and extract DSLX standard library
         run: |
@@ -56,3 +58,4 @@ jobs:
         run: |
           pre-commit install
           pre-commit run --all-files
+
