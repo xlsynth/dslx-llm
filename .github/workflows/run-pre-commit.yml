@@ -1,4 +1,4 @@
-name: run pre-commit tool
+name: CI Testing
 
 on:
   pull_request:
