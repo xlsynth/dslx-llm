@@ -13,7 +13,7 @@ fn gray_to_binary<N: u32>(gray: uN[N]) -> uN[N]
 
 ## Tests
 
-```dslx
+```dslx-snippet
 #[test]
 fn test_binary_to_gray_simple() {
     assert_eq(binary_to_gray(u3:0b000), u3:0b000);

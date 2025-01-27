@@ -10,15 +10,23 @@ Takes a bit vector that indicates which requestors are requesting a grant and
 the previous state for the arbiter, and returns a bit vector indicating which
 requestor has been granted and the corresponding output state.
 
+The prologue will be automatically included, just implement the signature in the output answer.
+
+## Prologue
+
+```dslx
+struct ArbiterState<N: u32> {}
+```
+
 ## Signature
 
 ```dslx-snippet
-fn fixed_arbiter<N: u32>(requests: bits[N], state: ArbiterState<N>) -> (bits[N], ArbiterState<N>);
+fn fixed_arbiter<N: u32>(requests: bits[N], state: ArbiterState<N>) -> (bits[N], ArbiterState<N>)
 ```
 
 ## Tests
 
-```dslx
+```dslx-snippet
 #[test]
 fn test_fixed_arbiter() {
   let state = ArbiterState<u32:4>{};

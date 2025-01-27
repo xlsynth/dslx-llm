@@ -13,7 +13,7 @@ fn distinct<COUNT: u32, N: u32, S: bool>(items: xN[S][N][COUNT], valid: bool[COU
 
 ## Tests
 
-```dslx
+```dslx-snippet
 #[test]
 fn test_simple_nondistinct() {
     assert_eq(distinct(u2[2]:[1, 1], bool[2]:[true, true]), false)
@@ -30,7 +30,7 @@ fn test_distinct_unsigned() {
 fn test_distinct_signed() {
     let items = s8[3]:[-1, 0, 1];
     let valid = bool[3]:[true, true, true];
-    assert_eq(distinct<u32:3, u32:8, true>(items as bits[8][3], valid), true);
+    assert_eq(distinct<u32:3, u32:8, true>(items, valid), true);
 }
 
 #[test]

@@ -17,7 +17,7 @@ fn widen_broadside<OUT: u32, IN: u32, N: u32>(x: u8[IN][N]) -> u8[OUT][N]
 
 ## Tests
 
-```dslx
+```dslx-snippet
 fn pad_bytes_left<OUT: u32, IN: u32>(x: u8[IN]) -> u8[OUT] {
     const_assert!(OUT >= IN);
     const INIT = u8[OUT]:[0, ...];

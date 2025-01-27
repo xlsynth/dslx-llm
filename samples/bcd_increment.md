@@ -8,16 +8,23 @@ function that increments an N-digit BCD number and returns:
 - whether the result was an overflow
 - what the incremented value is -- in the case of overflow, this should be zero
 
+The prologue will be automatically included, just implement the signature in the output answer.
+
+## Prologue
+
+```dslx
+type BcdDigit = u4;
+```
+
 ## Signature
 
 ```dslx-snippet
-type BcdDigit = u4;
 fn bcd_increment<N: u32>(x: BcdDigit[N]) -> (bool, BcdDigit[N])
 ```
 
 ## Tests
 
-```dslx
+```dslx-snippet
 const BCD0 = BcdDigit:0b0000;
 const BCD9 = BcdDigit:0b1001;
 

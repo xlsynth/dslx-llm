@@ -15,9 +15,9 @@ Write an integer comparator that supports:
 * eq: equal
 * ne: not-equal
 
-## Signature
+## Prologue
 
-```dslx-snippet
+```dslx
 enum Cmp: u4 {
     SGT = 0,
     SGE = 1,
@@ -30,7 +30,11 @@ enum Cmp: u4 {
     EQ = 8,
     NE = 9,
 }
+```
 
+## Signature
+
+```dslx-snippet
 fn run_cmp<N: u32>(lhs: bits[N], rhs: bits[N], cmp: Cmp) -> bool
 ```
 
