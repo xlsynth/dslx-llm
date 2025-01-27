@@ -5,16 +5,21 @@
 Write a function that performs saturating add/subtract of N-bit values and
 returns a boolean indicating if saturation occurred.
 
-Please emit the `Mode` enum provided into the output answer.
+The prologue will be automatically included, just implement the signature in the output answer.
 
-## Signature
+## Prologue
 
-```dslx-snippet
+```dslx
 enum Mode : u1 {
     ADD = 0,
     SUB = 1,
 }
-fn sat_addsub<N: u32>(x: uN[N], y: uN[N]) -> (bool, uN[N])
+```
+
+## Signature
+
+```dslx-snippet
+fn sat_addsub<N: u32>(mode: Mode, x: uN[N], y: uN[N]) -> (bool, uN[N])
 ```
 
 ## Tests

@@ -21,7 +21,7 @@ fn reverse_chunks<N: u32, FLAT: u32>(x: bits[FLAT]) -> bits[FLAT]
 
 ## Tests
 
-```dslx
+```dslx-snippet
 #[test]
 fn test_one_nibble() {
     let x = u4:0b1111;

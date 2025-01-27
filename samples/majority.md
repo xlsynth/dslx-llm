@@ -6,17 +6,21 @@ Compute the bitwise majority or minority of three inputs. For each bit
 position, the result is ‘1’ if at least two inputs have a ‘1’ (majority), or
 for minority the opposite. The mode determines which you do.
 
-Please emit the `Mode` enum provided into the output answer.
+The prologue will be automatically included, just implement the signature in the output answer.
 
-## Signature
+## Prologue
 
-```dslx-snippet
+```dslx
 enum Mode : u1 {
     MAJ = 0,
     MIN = 1,
 }
-fn bitwise_maj_min<N: u32>(a: bits[N], b: bits[N], c: bits[N],
-                           mode: Mode) -> bits[N]
+```
+
+## Signature
+
+```dslx-snippet
+fn bitwise_maj_min<N: u32>(a: bits[N], b: bits[N], c: bits[N], mode: Mode) -> bits[N]
 ```
 
 ## Tests

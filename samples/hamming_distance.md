@@ -12,7 +12,7 @@ fn hamming_distance<N: u32>(a: uN[N], b: uN[N]) -> uN[N]
 
 ## Tests
 
-```dslx
+```dslx-snippet
 #[test]
 fn test_hamming_distance_simple() {
     assert_eq(hamming_distance(u3:0b000, u3:0b000), u3:0);
