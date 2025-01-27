@@ -49,8 +49,8 @@ jobs:
 
       - name: Download DSLX typecheck binary
         run: |
-          curl -L "$DSLX_TYPECHECK_BINARY_URL" -o dslx_typecheck_main
-          chmod +x dslx_typecheck_main
+          curl -L "$DSLX_TYPECHECK_BINARY_URL" -o typecheck_main
+          chmod +x typecheck_main
 
       - name: Download and extract DSLX standard library
         run: |
