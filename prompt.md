@@ -39,6 +39,8 @@ pub fn int_to_float(x: s32) -> float32::F32 {
 }
 ```
 
+**No recursion** Recursion is not currently supported in DSLX, so algorithms need to be written iteratively. Often this can be done by making a fixed size array to hold intermediate results and iterating logarithmically to combine partial results from each stage.
+
 **No keyword arguments** As in Rust, there are no keyword-arguments for function parameters.
 
 **Standard Library Function for Bit-widths** `std::clog2(x)` is the standard library function that computes `ceil(log2(x))` which is often useful for determining bit-widths required to hold a binary number of a particular count of items. It gives back the same width type (unsigned integer) that it takes in. Analogously there is also a standard library function `std::flog2(x)` that computes `floor(log2(x))`.
@@ -286,11 +288,11 @@ fn show_array_rev() {
 ```dslx
 #[test]
 fn show_for_loop_evolves_accumulator() {
-    let a = u32[4]:[0, 1, 2, 3];
-    let result: u32 = for (element, accum) in a {  // accumulator often abbreviated `accum`
-			let new_accum = accum + element;
-			new_accum  // The result of the for-loop body is the new accumulator.
-		}(u32:0);  // The initial value of the accumulator is given as zero here.
+    let a = u7[4]:[0, 1, 2, 3];
+    let result: u32 = for (element, accum): (u7, u32) in a {  // accumulator often abbreviated `accum`
+        let new_accum = accum + (element as u32);
+        new_accum  // The result of the for-loop body is the new accumulator.
+    }(u32:0);  // The initial value of the accumulator is given as zero here.
     assert_eq(result, u32:6)
 }
 ```
