@@ -4,6 +4,8 @@
 
 Implement a full bitonic sort function, which takes an array and returns a fully sorted array in ascending order. Use the standard bitonic sort algorithm (i.e., building bitonic sequences and performing bitonic merges).
 
+You can assume that the item count will be a power of two -- if you do, please document so via `const_assert!`.
+
 ## Signature
 
 ```dslx-snippet
@@ -13,6 +15,12 @@ fn bitonic_sort<S: bool, N: u32, M: u32>(array: xN[S][N][M]) -> xN[S][N][M]
 ## Tests
 
 ```dslx-snippet
+#[test]
+fn test_bunch_of_zeros() {
+    assert_eq(bitonic_sort(s3[4]:[0, 0, 0, -1]), s3[4]:[-1, 0, 0, 0]);
+    assert_eq(bitonic_sort(u3[4]:[1, 0, 0, 0]), u3[4]:[0, 0, 0, 1])
+}
+
 fn sum_reduce<S: bool, N: u32, ITEMS: u32>(a: xN[S][N][ITEMS]) -> xN[S][N] {
     for (item, accum) in a {
         accum + item
