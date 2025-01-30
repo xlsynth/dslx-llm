@@ -62,6 +62,7 @@ fn show_clz_ctz_builtins() {
 * the starting position may be dynamic
 * the width is given as a type, *not* as a number (this is different from Verilog)
 * the result type of the width-slice expression is the type given after the `+:`
+* the "subject" type to slice **must be unsigned**
 
 ```dslx
 #[test]
@@ -120,7 +121,7 @@ fn show_bitwise_reduction_builtins() {
 }
 ```
 
-**Bit Concatenation** Since bitwise concatenation is common in hardware DSLX supports `++` as the bitwise concatenation operator:
+**Bit Concatenation** Since bitwise concatenation is common in hardware DSLX supports `++` as the bitwise concatenation operator -- it is supported for unsigned bits values and arrays:
 
 ```dslx
 #[test]
@@ -128,11 +129,39 @@ fn show_bitwise_concat() {
     let x = u8:0xab;
     let y = u16:0xcdef;
     let z = u4:0x7;
-    assert_eq(x ++ y ++ z, u28:0xabcdef7)
+    assert_eq(x ++ y ++ z, u28:0xabcdef7);
+
+    let a = u8[2]:[0xab, 0xcd];
+    let b = u8[2]:[0xef, 0x01];
+    assert_eq(a ++ b, u8[4]:[0xab, 0xcd, 0xef, 0x01]);
 }
 ```
 
 Note that DSLX code will typically prefer to use the `++` operator instead of the C-style pattern of `x << Y_BITS | y` because it is more correct by construction.
+
+**Binary Arithmetic Operations** Binary arithmetic operations generally take two values of the same type and produce a result of the same type -- except for comparisons, which produce a `bool` (which is the same as a `u1`). This means that adding or multiplying two numbers of `N` bits produces a number of `N` bits -- this also implies we must cast left hand and right hand side operands to the same type before performing the binary arithmetic operation:
+
+```dslx
+#[test]
+fn show_binary_arithmetic_operations() {
+    let x = u8:1;
+    let y = u8:2;
+    assert_eq(x + y, u8:3);
+    assert_eq(x * y, u8:2);
+}
+```
+
+To retain all of the bits from both the left hand and right hand side operands, there are standard library functions:
+
+```dslx
+import std;
+
+#[test]
+fn show_std_mul() {
+    assert_eq(std::umul(u8:1, u8:2), u16:2);
+    assert_eq(std::smul(s8:-1, s8:2), s16:-2);
+}
+```
 
 **Shift Amounts Must Be Unsigned** The language does not permit signed shift amounts because it's unclear what a possibly-negative shift would mean in hardware, all shift amounts must be unsigned:
 
