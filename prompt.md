@@ -1,4 +1,4 @@
-I’m going to teach you to write DSLX code through examples. DSLX is the Domain Specific Language for XLS. It’s similar to Rust but differs in key ways so you must pay attention to the differences. After I teach you the details of the language you will be asked to write correct code in DSLX in one shot and graded on the result, so do your best!
+I’m going to teach you to write DSLX code through examples. DSLX is the Domain Specific Language for XLS. It’s similar to Rust, and is whitespace insensitive, but the accepted syntax differs in key ways so you must pay attention to the differences. After I teach you the details of the language you will be asked to write correct code in DSLX in one shot and graded on the result, so do your best!
 
 To count the number of bits in a `u32`:
 
@@ -139,7 +139,7 @@ fn show_bitwise_concat() {
 
 Note that DSLX code will typically prefer to use the `++` operator instead of the C-style pattern of `x << Y_BITS | y` because it is more correct by construction.
 
-**Binary Arithmetic Operations** Binary arithmetic operations generally take two values of the same type and produce a result of the same type -- except for comparisons, which produce a `bool` (which is the same as a `u1`). This means that adding or multiplying two numbers of `N` bits produces a number of `N` bits -- this also implies we must cast left hand and right hand side operands to the same type before performing the binary arithmetic operation:
+**Binary Arithmetic Operations** Binary arithmetic operations take two values of the same type and produce a result of the same type -- except for comparisons, which produce a `bool`. (`bool` is the same as a `u1`.) This means that adding or multiplying two numbers of `N` bits produces a number of `N` bits -- this also implies we must cast left hand and right hand side operands to the same type before performing the binary arithmetic operation:
 
 ```dslx
 #[test]
@@ -148,6 +148,11 @@ fn show_binary_arithmetic_operations() {
     let y = u8:2;
     assert_eq(x + y, u8:3);
     assert_eq(x * y, u8:2);
+    assert_eq(x | y, u8:3);
+    assert_eq(x & y, u8:0);
+    assert_eq(x ^ y, u8:3);
+    assert_eq(y > x, true);
+    assert_eq(x < y, true);
 }
 ```
 
@@ -160,6 +165,16 @@ import std;
 fn show_std_mul() {
     assert_eq(std::umul(u8:1, u8:2), u16:2);
     assert_eq(std::smul(s8:-1, s8:2), s16:-2);
+}
+```
+
+As in Rust, conditional test expressions must be `bool`/`u1` values:
+
+```dslx
+#[test]
+fn show_conditional_test_expressions() {
+    assert_eq(u32:42, if true { u32:42 } else { u32:0 });
+    assert_eq(u32:0, if false { u32:42 } else { u32:0 });
 }
 ```
 
@@ -326,6 +341,22 @@ fn show_for_loop_evolves_accumulator() {
 }
 ```
 
+Note that if the accumulator is multiple values you need to use a tuple for the initial value:
+
+```dslx
+#[test]
+fn show_for_loop_with_tuple_accumulator() {
+    let a = u7[4]:[0, 1, 2, 3];
+    let (result, count) = for (element, (accum, count)): (u7, (u32, u32)) in a {
+        let new_accum = accum + (element as u32);
+        let new_count = count + u32:1;
+        (new_accum, new_count)
+    }((u32:0, u32:0));
+    assert_eq(result, u32:6);
+    assert_eq(count, u32:4);
+}
+```
+
 **No While Loops** Since functions in DSLX are not turing-complete there are no while loops, everything must be done with bounded loops; i.e. counted `for` loops. This is different from Rust.
 
 **Range Builtin for Iota** To make an array that’s filled with a range of values (sometimes also called “iota”) use the `range` builtin:
@@ -373,6 +404,8 @@ fn show_unsigned_source_extension_is_zero_extension() {
 ```
 
 To reiterate: there is never any reason to define a helper function like `zero_extend` or `sign_extend` in DSLX, just use the `as` cast operator -- if the source type is unsigned it will zero extend, and if the source type is signed it will sign extend.
+
+**Keywords** Note that keywords in the language include `bits`, `in`, `out`, `token`, and `chan`, and the `u1` to `u128` and `s1` to `s128`, beyond those you would expect from Rust -- keywords are context-insensitive and so cannot be used as identifiers.
 
 **Parameterized Functions** Parameterized functions in DSLX are similar to, but more powerful than, const generics in Rust. Parameterization in DSLX can do fairly arbitrary computation, and the syntax is shaped like so — note that any “derived parametric” values where we compute them based on other parametrics syntactically have their expressions in curls:
 
@@ -423,6 +456,17 @@ fn f<S: bool, N: u32>(x: xN[S][N]) -> (bool, u32) { (S, N) }
 fn show_parametric_signedness() {
     assert_eq(f(u7:0), (false, u32:7));
     assert_eq(f(s3:0), (true, u32:3));
+}
+```
+
+Note that sometimes there are limitations on the complexity of expressions you can put inline in a type annotation -- in those cases, make a constexpr binding ahead of the type annotation -- when in doubt about whether an expression can be placed in a type annotation, make a constexpr binding:
+
+```dslx
+fn f<N: u32>() {
+    const O = N + u32:2;
+    // Note: we bound O so we don't need to write `uN[{N + u32:2}]`.
+    let x: uN[O] = uN[O]:0;
+    trace_fmt!("x: {}", x);
 }
 ```
 
