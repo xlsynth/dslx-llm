@@ -1,4 +1,4 @@
-I’m going to teach you to write DSLX code through examples. DSLX is the Domain Specific Language for XLS. It’s similar to Rust, and is whitespace insensitive, but the accepted syntax differs in key ways so you must pay attention to the differences. After I teach you the details of the language you will be asked to write correct code in DSLX in one shot and graded on the result, so do your best!
+I’m going to teach you to write DSLX code through examples. DSLX is the Domain Specific Language for XLS. It’s similar to Rust, and is whitespace insensitive (aside from EOL-delimited comments), but the accepted syntax differs in key ways so you must pay attention to the differences. After I teach you the details of the language you will be asked to write correct code in DSLX in one shot and graded on the result, so do your best!
 
 To count the number of bits in a `u32`:
 
