@@ -317,6 +317,17 @@ fn show_zero_builtin() {
 }
 ```
 
+Analogous there is an `all_ones!` builtin:
+
+```dslx
+#[test]
+fn show_all_ones_builtin() {
+    type MyTuple = (u2[4], u3, bool);
+    let t: MyTuple = all_ones!<MyTuple>();
+    assert_eq(t, (u2[4]:[u2:0b11, ...], u3:0b111, true));
+}
+```
+
 **Array Reverse Built-In** DSLX has a built-in primitive for array reversal called `array_rev`:
 
 ```dslx
@@ -485,7 +496,28 @@ fn show_map() {
 
 **No List Comprehensions** As in Rust, there are no list comprehensions in DSLX. Instead of list comprehensions you must use the `map` built-in or a `for` loop.
 
-**Fixed Sizes** The sizes of values are all fixed, although they may be parameterized; i.e. there is no "vector like" type that can be built up in a loop -- instead, the full sized type must be created up front and we can update slices of it, e.g. in a `for` loop.
+**Fixed Sizes** The sizes of values are all fixed, although they may be parameterized; i.e. there is no "vector like" type that can be built up in a loop -- instead, the full sized type must be created up front and we can update slices of it, e.g. in a `for` loop. Example of updating an array whose full size is allocated up front:
+
+```dslx
+#[test]
+fn test_build_iota() {
+    const N = u32:4;
+    let a: u32[N] = for (i, a) in u32:0..N {
+        update(a, i, i)
+    }(u32[N]:[0, ...]);  // allocated full size up front instead of concatenating
+    assert_eq(a, u32[4]:[0, 1, 2, 3]);
+}
+```
+
+Or an example where we update bits in an existing ("pre-allocated, fixed-size") multi-bit value:
+
+```dslx
+#[test]
+fn test_update_bits() {
+    let init = u4:0b10_10;
+    assert_eq(bit_slice_update(init, u32:2, u2:0b11), u4:0b11_10);
+}
+```
 
 **Match Construct** Pattern matching in DSLX is similar to Rust's, it just supports a subset of patterns that Rust supports. Prefer to use match expressions instead of if/else ladders. Tuples and constants can notably be pattern matched on:
 

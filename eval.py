@@ -7,6 +7,7 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 import openai
 import termcolor
@@ -18,7 +19,7 @@ DSLX_STDLIB_PATH = os.environ['DSLX_STDLIB_PATH']
 
 assert os.path.exists(os.path.join(DSLX_STDLIB_PATH, 'std.x'))
 
-def load_system_prompt():
+def load_system_prompt() -> str:
     # Load the system prompt
     with open(PROMPT_FILE, "r") as f:
         system_prompt = f.read()
@@ -42,12 +43,12 @@ def print_color_diff(text1: str, text2: str) -> None:
         else:  # Unchanged lines
             print(line)
 
-def parse_sample(file_path):
+def parse_sample(file_path: str) -> dict[str, str]:
     """Parse the sample file to extract the prompt, signature, and tests."""
     with open(file_path, "r") as f:
         content = f.read()
-    sections = {}
-    current_section = None
+    sections: dict[str, list[str]] = {}
+    current_section: Optional[str] = None
     for line in content.splitlines():
         if line.startswith("## "):
             current_section = line[3:].strip().lower()
@@ -57,13 +58,24 @@ def parse_sample(file_path):
     return {k: "\n".join(v).strip() for k, v in sections.items()}
 
 class CodeGenerator:
-    def __init__(self, model, system_prompt):
+    def __init__(self, model: str, reasoning_effort: Optional[str], system_prompt: str):
         """Initialize the CodeGenerator with a persistent OpenAI connection."""
         self.client = openai.Client()
         self.model = model
+        self.reasoning_effort = reasoning_effort
         self.messages = [
             {"role": "user", "content": system_prompt}
         ]
+
+    def _get_chat_kwargs(self):
+        if self.model == 'o3-mini':
+            assert self.reasoning_effort is not None
+            return {
+                'model': 'o3-mini',
+                'reasoning_effort': self.reasoning_effort,
+                'messages': self.messages,
+            }
+        return {'model': self.model, 'messages': self.messages}
 
     def generate_code(self, prompt, signature):
         """Generate code using the OpenAI API and retain context for follow-ups."""
@@ -72,8 +84,7 @@ class CodeGenerator:
 
         # Make the API call
         response = self.client.chat.completions.create(
-            model=self.model,
-            messages=self.messages,
+            **self._get_chat_kwargs()
         )
 
         # Capture assistant response and add it to the message history
@@ -89,8 +100,7 @@ class CodeGenerator:
 
         # Make the API call
         response = self.client.chat.completions.create(
-            model=self.model,
-            messages=self.messages,
+            **self._get_chat_kwargs()
         )
 
         # Capture assistant response and add it to the message history
@@ -99,7 +109,7 @@ class CodeGenerator:
 
         return assistant_response
 
-def strip_fences(text):
+def strip_fences(text: str) -> str:
     text = text.strip()
     if text.startswith('```'):
         lines = text.splitlines()
@@ -137,14 +147,14 @@ def run_dslx_tests(generated_code: str, test_cases: str, sample_filename: str, t
     command = subprocess.list2cmdline(cmd)
     return RunResult(command, success, result.returncode, result.stdout, result.stderr)
 
-def evaluate_sample(sample_path: str, model: str, max_retries: int) -> tuple[bool, bool]:
+def evaluate_sample(sample_path: str, model: str, reasoning_effort: Optional[str], max_retries: int) -> tuple[bool, bool]:
     """Evaluate a single sample."""
     _, sample_filename = os.path.split(sample_path)
     sample_filename, _ = os.path.splitext(sample_filename)
 
     sample = parse_sample(sample_path)
     prompt, signature, tests = sample["prompt"], sample["signature"], sample["tests"]
-    codegen = CodeGenerator(model, SYSTEM_PROMPT)
+    codegen = CodeGenerator(model, reasoning_effort, SYSTEM_PROMPT)
 
     with tempfile.TemporaryDirectory(suffix=f'-{model}-{sample_filename}', delete=False) as tmpdir:
         print('tmpdir:', tmpdir)
@@ -198,17 +208,18 @@ def evaluate_sample(sample_path: str, model: str, max_retries: int) -> tuple[boo
     print("❌ All attempts failed.")
     return False, first_attempt_success
 
-def get_sample_choices():
+def get_sample_choices() -> list[str]:
     return [os.path.splitext(filename)[0] for filename in os.listdir(SAMPLES_DIR)]
 
 def main():
     """Main function to evaluate all samples."""
-    MODEL_CHOICES = ['gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o1-preview']
+    MODEL_CHOICES = ['gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o1-preview', 'o3-mini']
 
     parser = optparse.OptionParser()
     parser.add_option('--model', default=None, choices=MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(MODEL_CHOICES))
     parser.add_option('--sample', default=None, choices=get_sample_choices())
     parser.add_option('--max-retries', default=3, type=int)
+    parser.add_option('--reasoning-effort', default=None, choices=['low', 'medium', 'high'], help='choose a reasoning effort; choices: %s' % '|'.join(['low', 'medium', 'high']))
     opts, args = parser.parse_args()
 
     if args:
@@ -225,7 +236,7 @@ def main():
 
     for sample_file in sample_files:
         print(f"Evaluating {sample_file}...")
-        success, first_attempt_success = evaluate_sample(sample_file, opts.model, opts.max_retries)
+        success, first_attempt_success = evaluate_sample(sample_file, opts.model, opts.reasoning_effort, opts.max_retries)
         results[sample_file] = {
             "success": success,
             "first_attempt_success": first_attempt_success,
