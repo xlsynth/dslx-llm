@@ -11,6 +11,9 @@ import pytest
 import tiktoken
 
 PROMPT_MD_FILE = 'prompt.md'
+XLSYNTH_TOOLS_DIR = os.environ['XLSYNTH_TOOLS']
+DSLX_INTERPRETER_MAIN = os.path.join(XLSYNTH_TOOLS_DIR, 'dslx_interpreter_main')
+TYPECHECK_MAIN = os.path.join(XLSYNTH_TOOLS_DIR, 'typecheck_main')
 
 assert 'DSLX_STDLIB_PATH' in os.environ, 'Please add DSLX_STDLIB_PATH to your environment variables; e.g. `export DSLX_STDLIB_PATH=$HOME/opt/xlsynth/latest/xls/dslx/stdlib/`'
 
@@ -111,7 +114,7 @@ def run_on_single_file(binary: str, code_sample: str, more_flags: tuple[str, ...
         tmp.write(code_sample)
         tmp_filename = tmp.name
 
-    print(f'Running {binary} on {tmp_filename} ...')
+    print(f'Running {binary} ({os.path.realpath(binary)} on {tmp_filename} ...')
     print('Contents:\n<<EOF\n', code_sample, '\n<<EOF\n', sep='')
 
     cmd = [binary]
@@ -134,13 +137,13 @@ def run_on_single_file(binary: str, code_sample: str, more_flags: tuple[str, ...
 @pytest.mark.parametrize('code_sample', PROMPT_CODE_SAMPLES)
 def test_prompt_code_sample(code_sample: str):
     """Tests DSLX code samples in prompt by running through the interpreter."""
-    run_on_single_file('dslx_interpreter_main', code_sample, more_flags=('--compare=jit',))
+    run_on_single_file(DSLX_INTERPRETER_MAIN, code_sample, more_flags=('--compare=jit',))
 
 
 @pytest.mark.parametrize('sample_with_stub', SAMPLES_WITH_STUBS, ids=lambda x: x.name)
 def test_samples_with_stub_typecheck(sample_with_stub: CodeSample):
     """Tests that DSLX tests pass with a stub signature."""
-    run_on_single_file('typecheck_main', sample_with_stub.content)
+    run_on_single_file(TYPECHECK_MAIN, sample_with_stub.content)
 
 
 def test_prompt_size():

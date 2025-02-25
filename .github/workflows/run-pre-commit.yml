@@ -49,6 +49,7 @@ jobs:
           echo "DSLX_INTERPRETER_BINARY_URL=$DSLX_INTERPRETER_BINARY_URL" >> $GITHUB_ENV
           echo "DSLX_TYPECHECK_BINARY_URL=$DSLX_TYPECHECK_BINARY_URL" >> $GITHUB_ENV
           echo "DSLX_STDLIB_URL=$DSLX_STDLIB_URL" >> $GITHUB_ENV
+          echo "XLSYNTH_TOOLS=$pwd" >> $GITHUB_ENV
 
       - name: Download DSLX interpreter binary
         run: |
@@ -72,6 +73,7 @@ jobs:
       - name: Run pre-commit hooks
         env:
           DSLX_STDLIB_PATH: ${{ env.DSLX_STDLIB_PATH }}
+          XLSYNTH_TOOLS: ${{ env.XLSYNTH_TOOLS }}
         run: |
           pre-commit install
           SKIP=no-commit-to-branch pre-commit run --all-files
