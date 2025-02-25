@@ -15,6 +15,8 @@ Write an integer comparator that supports:
 * eq: equal
 * ne: not-equal
 
+The prologue will be automatically included, just implement the signature in the output answer.
+
 ## Prologue
 
 ```dslx

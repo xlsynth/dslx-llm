@@ -43,7 +43,14 @@ def print_color_diff(text1: str, text2: str) -> None:
         else:  # Unchanged lines
             print(line)
 
-def parse_sample(file_path: str) -> dict[str, str]:
+@dataclasses.dataclass
+class Sample:
+    prompt: str
+    signature: str
+    tests: str
+    prologue: Optional[str] = None
+
+def parse_sample(file_path: str) -> Sample:
     """Parse the sample file to extract the prompt, signature, and tests."""
     with open(file_path, "r") as f:
         content = f.read()
@@ -55,7 +62,12 @@ def parse_sample(file_path: str) -> dict[str, str]:
             sections[current_section] = []
         elif current_section:
             sections[current_section].append(line)
-    return {k: "\n".join(v).strip() for k, v in sections.items()}
+    return Sample(
+        prompt="\n".join(sections["prompt"]).strip(),
+        signature="\n".join(sections["signature"]).strip(),
+        tests="\n".join(sections["tests"]).strip(),
+        prologue="\n".join(sections["prologue"]).strip() if "prologue" in sections else None,
+    )
 
 class CodeGenerator:
     def __init__(self, model: str, reasoning_effort: Optional[str], system_prompt: str):
@@ -77,10 +89,17 @@ class CodeGenerator:
             }
         return {'model': self.model, 'messages': self.messages}
 
-    def generate_code(self, prompt, signature):
+    def generate_code(self, prompt: str, signature: str, prologue: Optional[str] = None) -> str:
         """Generate code using the OpenAI API and retain context for follow-ups."""
         # Add user prompt to the message history
-        self.messages.append({"role": "user", "content": f"{prompt}\n\nSignature:\n{signature}"})
+        message = prompt
+        if prologue:
+            message += '\n\nPrologue:\n' + prologue
+        message += '\n\nSignature:\n' + signature
+        termcolor.cprint('<<PROBLEM', color='blue')
+        print(message)
+        termcolor.cprint('PROBLEM', color='blue')
+        self.messages.append({"role": "user", "content": message})
 
         # Make the API call
         response = self.client.chat.completions.create(
@@ -125,13 +144,17 @@ class RunResult:
     stdout: str
     stderr: str
 
-def run_dslx_tests(generated_code: str, test_cases: str, sample_filename: str, tmpdir: str) -> RunResult:
+def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tmpdir: str) -> RunResult:
     """Run DSLX tests using the interpreter."""
     prologue_lines = []
     if 'import std;' not in generated_code:
         prologue_lines.append('import std;')
+    if sample.prologue:
+        prologue = strip_fences(sample.prologue)
+        for line in prologue.splitlines():
+            prologue_lines.append(line.strip())
 
-    full_code = '\n'.join(prologue_lines) + '\n\n' + strip_fences(generated_code) + "\n\n// -- tests\n\n" + strip_fences(test_cases)
+    full_code = '\n'.join(prologue_lines) + '\n\n' + strip_fences(generated_code) + "\n\n// -- tests\n\n" + strip_fences(sample.tests)
     x_path = os.path.join(tmpdir, sample_filename + ".x")
     with open(x_path, "w") as f:
         f.write(full_code)
@@ -147,13 +170,27 @@ def run_dslx_tests(generated_code: str, test_cases: str, sample_filename: str, t
     command = subprocess.list2cmdline(cmd)
     return RunResult(command, success, result.returncode, result.stdout, result.stderr)
 
-def evaluate_sample(sample_path: str, model: str, reasoning_effort: Optional[str], max_retries: int) -> tuple[bool, bool]:
-    """Evaluate a single sample."""
+@dataclasses.dataclass
+class EvaluateSampleResult:
+    success: bool
+    first_attempt_success: bool
+
+def evaluate_sample(sample_path: str, model: str, reasoning_effort: Optional[str], max_retries: int) -> EvaluateSampleResult:
+    """Evaluate a single sample.
+
+    Args:
+        sample_path: The path to the sample file.
+        model: The model to evaluate.
+        reasoning_effort: The reasoning effort to use, i.e. in case of o3-mini.
+        max_retries: The maximum number of retries to attempt before declaring failure.
+
+    Returns:
+        A tuple containing a boolean indicating whether the sample was evaluated successfully and a boolean indicating whether the sample was evaluated successfully on the first attempt.
+    """
     _, sample_filename = os.path.split(sample_path)
     sample_filename, _ = os.path.splitext(sample_filename)
 
-    sample = parse_sample(sample_path)
-    prompt, signature, tests = sample["prompt"], sample["signature"], sample["tests"]
+    sample: Sample = parse_sample(sample_path)
     codegen = CodeGenerator(model, reasoning_effort, SYSTEM_PROMPT)
 
     with tempfile.TemporaryDirectory(suffix=f'-{model}-{sample_filename}', delete=False) as tmpdir:
@@ -168,7 +205,7 @@ def evaluate_sample(sample_path: str, model: str, reasoning_effort: Optional[str
             if feedback_from_last_iteration is not None:
                 generated_code = codegen.provide_feedback('```\n' + feedback_from_last_iteration + '\n```\n')
             else:
-                generated_code = codegen.generate_code(prompt, signature)
+                generated_code = codegen.generate_code(sample.prompt, sample.signature, sample.prologue)
 
             all_generated.append(generated_code)
 
@@ -181,7 +218,7 @@ def evaluate_sample(sample_path: str, model: str, reasoning_effort: Optional[str
                 print_color_diff(all_generated[-2], all_generated[-1])
                 termcolor.cprint('DIFF', color='blue')
 
-            run_result = run_dslx_tests(generated_code, tests, f'{sample_filename}-attempt-{attempt}', tmpdir)
+            run_result = run_dslx_tests(generated_code, sample, f'{sample_filename}-attempt-{attempt}', tmpdir)
 
             # Write out results to the tmpdir as well.
             with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-result-retcode.txt'), 'w') as f:
@@ -195,7 +232,7 @@ def evaluate_sample(sample_path: str, model: str, reasoning_effort: Optional[str
                 print(f"✅ Success on attempt {attempt}")
                 if attempt == 1:
                     first_attempt_success = True
-                return True, first_attempt_success
+                return EvaluateSampleResult(success=True, first_attempt_success=first_attempt_success)
 
             print(f"❌ Error on attempt {attempt}; command: {run_result.command}")
 
@@ -206,7 +243,7 @@ def evaluate_sample(sample_path: str, model: str, reasoning_effort: Optional[str
             feedback_from_last_iteration = run_result.stderr
 
     print("❌ All attempts failed.")
-    return False, first_attempt_success
+    return EvaluateSampleResult(success=False, first_attempt_success=first_attempt_success)
 
 def get_sample_choices() -> list[str]:
     return [os.path.splitext(filename)[0] for filename in os.listdir(SAMPLES_DIR)]
@@ -236,10 +273,10 @@ def main():
 
     for sample_file in sample_files:
         print(f"Evaluating {sample_file}...")
-        success, first_attempt_success = evaluate_sample(sample_file, opts.model, opts.reasoning_effort, opts.max_retries)
+        result: EvaluateSampleResult = evaluate_sample(sample_file, opts.model, opts.reasoning_effort, opts.max_retries)
         results[sample_file] = {
-            "success": success,
-            "first_attempt_success": first_attempt_success,
+            "success": result.success,
+            "first_attempt_success": result.first_attempt_success,
         }
 
     # Generate a scorecard
