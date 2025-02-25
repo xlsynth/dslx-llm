@@ -11,6 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Instal libc++
+        run: |
+          sudo apt-get install libc++
+
       - name: Checkout code
         uses: actions/checkout@v3
 
