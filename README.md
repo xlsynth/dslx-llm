@@ -22,7 +22,7 @@ To run eval on a specific sample:
 
 ```sh
 export OPENAI_API_KEY=""  # replace with your key
-export DSLX_STDLIB_PATH=""  # replace with DSLX stdlib path
+export XLSYNTH_TOOLS=""  # replace with xlsynth tools dir via github.com/xlsynth/xlsynth/releases
 python eval.py --model gpt-3.5-turbo --sample saturating_addsub --max-retries 5
 ```
 
@@ -100,7 +100,7 @@ we use.
 To test the samples in the prompt Markdown:
 
 ```
-$ DSLX_STDLIB_PATH=$HOME/opt/xlsynth/latest/xls/dslx/stdlib/ pytest test_prompt.py
+DSLX_STDLIB_PATH=$HOME/opt/xlsynth/latest/xls/dslx/stdlib/ pytest test_prompt.py
 ```
 
 ## Ideas not yet added
