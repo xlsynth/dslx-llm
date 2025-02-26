@@ -539,6 +539,29 @@ fn show_match() {
 }
 ```
 
+**`fail!` built-in** Similar to `todo!()` or `unimplemented!()` or `panic!()` in Rust DSLX has the `fail!(label_string, default_value)` builtin. If failures are "disabled" (i.e. the code is turned to Verilog without assertions enabled) then the `fail!` builtin call expression yields the `default_value`, so that the semantics are always well defined:
+
+```dslx
+fn my_function_that_should_never_get_42(x: u32) -> u32 {
+    match x {
+        u32:42 => fail!("failed_precondition_got_42", u32:0),
+        _ => x,
+    }
+}
+
+#[test]
+fn test_my_function_that_should_never_get_42() {
+    assert_eq(my_function_that_should_never_get_42(u32:1), u32:1);
+    // In the DSLX interpreter this will fail uncommented with:
+    // `FailureError: The program being interpreted failed! u32:0`
+    // But if we converted this to Verilog with assertions disabled it would be well defined to
+    // produce u32:0 in that case.
+    // assert_eq(my_function_that_should_never_get_42(u32:42), u32:0);
+}
+```
+
+Note that this `default_value` also allows the typechecker to see that the types produced by the different match arms are all compatible.
+
 **Quickcheck Tests** Since comprehensive testing is very important for hardware artifacts, DSLX has first class support for quickcheck tests. The quickcheck function can take arbitrary number and type of parameters and it simply has to return a boolean indicating that the test case passed:
 
 ```dslx

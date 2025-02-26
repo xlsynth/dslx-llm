@@ -7,17 +7,15 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 
 import openai
 import termcolor
 
+import tools
+
 PROMPT_FILE = "prompt.md"
 SAMPLES_DIR = "samples/"
-DSLX_INTERPRETER = "dslx_interpreter_main"
-DSLX_STDLIB_PATH = os.environ['DSLX_STDLIB_PATH']
-
-assert os.path.exists(os.path.join(DSLX_STDLIB_PATH, 'std.x'))
 
 def load_system_prompt() -> str:
     # Load the system prompt
@@ -50,7 +48,7 @@ class Sample:
     tests: str
     prologue: Optional[str] = None
 
-def parse_sample(file_path: str) -> Sample:
+def parse_sample(file_path: Path) -> Sample:
     """Parse the sample file to extract the prompt, signature, and tests."""
     with open(file_path, "r") as f:
         content = f.read()
@@ -159,7 +157,7 @@ def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tm
     with open(x_path, "w") as f:
         f.write(full_code)
 
-    cmd = [DSLX_INTERPRETER, x_path, '--dslx_stdlib_path', DSLX_STDLIB_PATH, '--compare=jit']
+    cmd = [tools.DSLX_INTERPRETER_MAIN, x_path, '--dslx_stdlib_path', tools.DSLX_STDLIB_PATH, '--compare=jit']
     result = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
@@ -175,7 +173,7 @@ class EvaluateSampleResult:
     success: bool
     first_attempt_success: bool
 
-def evaluate_sample(sample_path: str, model: str, reasoning_effort: Optional[str], max_retries: int) -> EvaluateSampleResult:
+def evaluate_sample(sample_path: Path, model: str, *, reasoning_effort: Optional[str], max_retries: int) -> EvaluateSampleResult:
     """Evaluate a single sample.
 
     Args:
@@ -248,7 +246,7 @@ def evaluate_sample(sample_path: str, model: str, reasoning_effort: Optional[str
 def get_sample_choices() -> list[str]:
     return [os.path.splitext(filename)[0] for filename in os.listdir(SAMPLES_DIR)]
 
-def main():
+def main() -> None:
     """Main function to evaluate all samples."""
     MODEL_CHOICES = ['gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o1-preview', 'o3-mini']
 
@@ -256,7 +254,7 @@ def main():
     parser.add_option('--model', default=None, choices=MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(MODEL_CHOICES))
     parser.add_option('--sample', default=None, choices=get_sample_choices())
     parser.add_option('--max-retries', default=3, type=int)
-    parser.add_option('--reasoning-effort', default=None, choices=['low', 'medium', 'high'], help='choose a reasoning effort; choices: %s' % '|'.join(['low', 'medium', 'high']))
+    parser.add_option('--reasoning-effort', default='high', choices=['low', 'medium', 'high'], help='choose a reasoning effort; choices: %s' % '|'.join(['low', 'medium', 'high']))
     opts, args = parser.parse_args()
 
     if args:
@@ -264,35 +262,32 @@ def main():
     if opts.model is None:
         parser.error('--model is required')
 
-    sample_files = list(Path(SAMPLES_DIR).glob("*.md"))
+    sample_files: List[Path] = list(Path(SAMPLES_DIR).glob("*.md"))
 
     if opts.sample:
-        sample_files = [os.path.join(SAMPLES_DIR, opts.sample + '.md')]
+        sample_files = [Path(SAMPLES_DIR, opts.sample + '.md')]
 
-    results = {}
+    results: Dict[Path, EvaluateSampleResult] = {}
 
     for sample_file in sample_files:
         print(f"Evaluating {sample_file}...")
-        result: EvaluateSampleResult = evaluate_sample(sample_file, opts.model, opts.reasoning_effort, opts.max_retries)
-        results[sample_file] = {
-            "success": result.success,
-            "first_attempt_success": result.first_attempt_success,
-        }
+        result: EvaluateSampleResult = evaluate_sample(sample_file, opts.model, reasoning_effort=opts.reasoning_effort, max_retries=opts.max_retries)
+        results[sample_file] = result
 
     # Generate a scorecard
     total_samples = len(results)
-    total_success = sum(1 for r in results.values() if r["success"])
-    first_attempt_success_count = sum(1 for r in results.values() if r["first_attempt_success"])
+    total_success = sum(1 for r in results.values() if r.success)
+    first_attempt_success_count = sum(1 for r in results.values() if r.first_attempt_success)
 
     print("\n=== SCORECARD ===")
     for sample, result in results.items():
-        if result['success']:
+        if result.success:
             status = "PASS"
             leader = "✅"
         else:
             status = "FAIL"
             leader = "❌"
-        first_attempt = "FIRST ATTEMPT" if result["first_attempt_success"] else "MULTIPLE ATTEMPTS"
+        first_attempt = "FIRST ATTEMPT" if result.first_attempt_success else "MULTIPLE ATTEMPTS"
         print(f"{leader} {sample}: {status} ({first_attempt})")
 
     print("\nSummary:")
