@@ -317,6 +317,8 @@ fn show_zero_builtin() {
 }
 ```
 
+Note that the `zero!<T>()` macro must be invoked to produce a value with the given type `T`.
+
 Analogous there is an `all_ones!` builtin:
 
 ```dslx
