@@ -99,7 +99,7 @@ we use.
 
 To test the samples in the prompt Markdown:
 
-```
+```shell
 DSLX_STDLIB_PATH=$HOME/opt/xlsynth/latest/xls/dslx/stdlib/ pytest test_prompt.py
 ```
 
@@ -107,3 +107,9 @@ DSLX_STDLIB_PATH=$HOME/opt/xlsynth/latest/xls/dslx/stdlib/ pytest test_prompt.py
 
 * Various hashers and PRNGs, e.g. `xoshiro256**` and similar.
 * More arbiters: LRU, round robin, hierarchical round robin (via composition).
+
+## Ideas that are too simple
+
+* Parity: this is simply a call to the `std::popcount` function <https://google.github.io/xls/dslx_std/#stdpopcount>
+* Bit Reversal: this is simply a call to the `rev` built-in function <https://google.github.io/xls/dslx_std/#rev>
+* One-Hot Encoder: this is simply a call to the `encode` built-in function <https://google.github.io/xls/dslx_std/#encode>
