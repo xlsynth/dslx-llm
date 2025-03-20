@@ -2,9 +2,11 @@
 
 ## Prompt
 
-Implement a 1D convolution function that computes the convolution of an 8-element input array with a 3-element kernel. The convolution operation multiplies overlapping segments of the input by the kernel and sums the results, producing an output array of length 6. The input and kernel arrays consist of 4-bit unsigned values, and the computed sums are stored as 16-bit unsigned values.
+Implement a 1D convolution function that computes the convolution of an `D`-element input array with a `K`-element kernel. The convolution operation multiplies overlapping segments of the input by the kernel and sums the results, producing an output array of length `D-K+1`. The input and kernel arrays consist of 4-bit unsigned values, and the computed sums are stored as 16-bit unsigned values.
 
-Note that this is a "valid-only" convolution, i.e. there are only six positions in the input where the kernel completely fits, so we don't need need to specify what padding might be used if the kernel was out of bounds of the data.
+Note that this is a "valid-only" convolution, i.e. there are only `D-K+1` positions in the input where the kernel completely fits, so we don't need need to specify what padding might be used if the kernel was out of bounds of the data.
+
+The function may const-assert that the data is at least as wide as the kernel.
 
 ## Signature
 
@@ -33,9 +35,9 @@ fn test_conv1d_basic() {
 
 #[test]
 fn test_conv1d_data_and_kernel_same_size() {
-    let d = [u4:1];
-    let k = [u4:5];
-    let want = [u16:5];
+    let d = [u4:15];
+    let k = [u4:15];
+    let want = [u16:225];
     assert_eq(conv1d(d, k), want);
 }
 
