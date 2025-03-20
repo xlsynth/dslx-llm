@@ -43,7 +43,7 @@ fn test_fixed_arbiter() {
 
   // Test case 3: no requestors are requesting
   let requests3 = bits[4]:0b0000;
-  let (grant3, state) = fixed_arbiter(requests3, state);
+  let (grant3, _state) = fixed_arbiter(requests3, state);
   assert_eq(grant3, bits[4]:0b0000);  // no grant should be issued
 }
 
