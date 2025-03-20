@@ -398,6 +398,8 @@ fn show_cast_of_a_literal() {
 }
 ```
 
+**Pop quiz!** Which is correct for DSLX, `0u8` or `u8:0`? In DSLX the latter -- `u8:0` -- is the correct syntax.
+
 As a brief reminder of the Rust rules, if you extend an signed source number, a sign extension is performed, and if you extend an unsigned source number, a zero extension is performed:
 
 ```dslx
