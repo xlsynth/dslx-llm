@@ -372,13 +372,13 @@ fn show_for_loop_with_tuple_accumulator() {
 
 **No While Loops** Since functions in DSLX are not turing-complete there are no while loops, everything must be done with bounded loops; i.e. counted `for` loops. This is different from Rust.
 
-**Range Builtin for Iota** To make an array that’s filled with a range of values (sometimes also called “iota”) use the `range` builtin:
+**Range Builtin for Iota** To make an array that’s filled with a range of values (sometimes also called “iota”) use exclusive range syntax:
 
 ```dslx
 #[test]
 fn show_range_as_array_filled_with_sequentials() {
-    assert_eq(range(u32:0, u32:4), u32[4]:[0, 1, 2, 3]);
-    assert_eq(range(u32:1, u32:3), u32[2]:[1, 2]);
+    assert_eq(u32:0..u32:4, u32[4]:[0, 1, 2, 3]);
+    assert_eq(u32:1..u32:3, u32[2]:[1, 2]);
 }
 ```
 
