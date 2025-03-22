@@ -108,6 +108,7 @@ DSLX_STDLIB_PATH=$HOME/opt/xlsynth/latest/xls/dslx/stdlib/ pytest test_prompt.py
 * Various hashers and PRNGs, e.g. `xoshiro256**` and similar.
 * More arbiters: LRU, round robin, hierarchical round robin (via composition).
 * Iterative shift-add multiplier.
+* Dot product / matmul.
 
 ## Ideas that are too simple
 

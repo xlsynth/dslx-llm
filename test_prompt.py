@@ -156,3 +156,53 @@ def test_prompt_size():
 
     # Check we stay comfortably within a reasonable context window.
     assert token_count <= 8 * 1024
+
+
+# Added test for replacing signature with naive_reference in samples that contain 'fn naive_reference'
+NAIVE_REFERENCE_FILES = [
+    filename for filename in os.listdir("samples")
+    if filename.endswith(".md") and "fn naive_reference" in open(os.path.join("samples", filename)).read()
+]
+
+@pytest.mark.parametrize("sample_filename", NAIVE_REFERENCE_FILES)
+def test_naive_reference_replacement(sample_filename: str) -> None:
+    # Get the DSLX snippet from the `## Tests` section of the sample markdown file.
+    # First we need to extract the `Tests` section then we extract the fence from within that.
+    with open(os.path.join("samples", sample_filename), "r") as f:
+        content = f.read()
+    tests_re = re.compile(r"^## Tests\n(.*)", re.DOTALL | re.MULTILINE)
+    tests_match = tests_re.search(content)
+    if tests_match:
+        dslx_code = tests_match.group(1).strip()
+    else:
+        pytest.skip(f"No tests section found in {sample_filename}")
+    tests_fence_re = re.compile(r"```dslx-snippet(.*?)```", re.DOTALL)
+    tests_fence_match = tests_fence_re.search(dslx_code)
+    if tests_fence_match:
+        dslx_code = tests_fence_match.group(1).strip()
+    else:
+        pytest.skip(f"No dslx-snippet fence found in tests section of {sample_filename}")
+
+    print(f"DSLX code: {dslx_code}")
+
+    # Determine the name of the function that the LLM is expected to produce from the `## Signature` section.
+    # Note that the signature is also contained in a dslx-snippet code fence.
+    signature_re = re.compile(r"```dslx-snippet(.*?)```", re.DOTALL)
+    signature_match = signature_re.search(content)
+    if signature_match:
+        # From within the signature we want to extract the function name.
+        signature = signature_match.group(1).strip()
+        signature_match = re.match(r"fn\s+(\w+)\s*", signature)
+        assert signature_match is not None, f"No function name found in signature: {signature}"
+        signature_name = signature_match.group(1)
+    else:
+        pytest.skip(f"No dslx-snippet fence found in signature section of {sample_filename}")
+
+    print(f"Signature name: {signature_name!r}")
+
+    # Replace references to the signature-given function name with references to
+    # `naive_reference` -- this let us check everything compiles and runs when we compare the
+    # reference code to itself.
+    modified_dslx_code = dslx_code.replace(signature_name, "naive_reference")
+    # Run the modified DSLX code through the interpreter.
+    run_on_single_file(tools.DSLX_INTERPRETER_MAIN, modified_dslx_code, more_flags=("--compare=jit",))
