@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
+from typing import Optional
 import dataclasses
 import os
 import re
@@ -27,6 +28,19 @@ def extract_dslx_code_samples(md_file):
     code_samples = CODE_FENCE_RE.findall(md_content)
     return code_samples
 
+
+def try_extract_prologue(md_content: str) -> Optional[str]:
+    """Tries to extract the prologue from the markdown content."""
+    prologue_re = re.compile(r'^## Prologue\s*\n(.*?)^##', re.DOTALL | re.MULTILINE)
+    prologue_match = prologue_re.search(md_content)
+    if prologue_match:
+        prologue_section_text = prologue_match.group(1)
+        # Now we have to extract the code from the fence inside this section.
+        prologue_code_re = re.compile(r'^```dslx\s*\n(.*?)^```', re.DOTALL | re.MULTILINE)
+        prologue_code_match = prologue_code_re.search(prologue_section_text)
+        if prologue_code_match:
+            return prologue_code_match.group(1)
+    return None
 
 @dataclasses.dataclass
 class CodeSample:
@@ -182,6 +196,9 @@ def test_naive_reference_replacement(sample_filename: str) -> None:
         dslx_code = tests_fence_match.group(1).strip()
     else:
         pytest.skip(f"No dslx-snippet fence found in tests section of {sample_filename}")
+
+    if prologue := try_extract_prologue(content):
+        dslx_code = f"{prologue}\n{dslx_code}"
 
     print(f"DSLX code: {dslx_code}")
 
