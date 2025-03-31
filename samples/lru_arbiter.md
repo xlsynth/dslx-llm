@@ -20,7 +20,7 @@ The prologue will be automatically included, just implement the signature in the
 ## Signature
 
 ```dslx-snippet
-fn lru_arbiter<N: u32>(requests: bits[N], state: u32[N]) -> (bits[N], u32[N])
+fn lru_arbiter<N: u32, IndexWidth: u32 = {std::clog2(N)}>(requests: bits[N], state: uN[IndexWidth][N]) -> (bits[N], uN[IndexWidth][N])
 ```
 
 ## Tests
@@ -99,7 +99,8 @@ const TEST_INDEX_WIDTH = std::clog2(TEST_N);
 
 // Tests the granted_at_requested_index test helper function.
 #[quickcheck]
-fn quickcheck_granted_at_requested_index(req: bits[TEST_N], grant: bits[TEST_N]) -> bool {
+fn quickcheck_helper_granted_at_requested_index(req: bits[TEST_N], grant: bits[TEST_N]) -> bool {
+
   // Having more than one grant is undefined behavior, so we just return true.
   // TODO(mgottscho): Is there a way to express this constraint in QuickCheck?
   if std::popcount(grant) != uN[TEST_N]:1 {
@@ -113,17 +114,17 @@ fn quickcheck_granted_at_requested_index(req: bits[TEST_N], grant: bits[TEST_N])
 
 // Tests the highest_priority_is_granted test helper function.
 #[test]
-fn test_highest_priority_is_granted_true() {
+fn test_helper_highest_priority_is_granted_true() {
     let req = bits[TEST_N]:0b11111;
     let ref_priority_order = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 1, 2, 3, 4];
     let grant = bits[TEST_N]:0b00001;
     assert_eq(highest_priority_is_granted(req, ref_priority_order, grant), true);
-    
+
     let req = bits[TEST_N]:0b11111;
     let ref_priority_order = uN[TEST_INDEX_WIDTH][TEST_N]:[4, 0, 1, 2, 3];
     let grant = bits[TEST_N]:0b10000;
     assert_eq(highest_priority_is_granted(req, ref_priority_order, grant), true);
-    
+
     let req = bits[TEST_N]:0b00000;
     let ref_priority_order = uN[TEST_INDEX_WIDTH][TEST_N]:[3, 0, 1, 2, 4];
     let grant = bits[TEST_N]:0b00000;
@@ -132,12 +133,12 @@ fn test_highest_priority_is_granted_true() {
 
 // Tests the highest_priority_is_granted test helper function.
 #[test]
-fn test_highest_priority_is_granted_false() {
+fn test_helper_highest_priority_is_granted_false() {
     let req = bits[TEST_N]:0b00110;
     let ref_priority_order = uN[TEST_INDEX_WIDTH][TEST_N]:[4, 3, 0, 2, 1];
     let grant = bits[TEST_N]:0b00010;
     assert_eq(highest_priority_is_granted(req, ref_priority_order, grant), false);
-    
+
     let req = bits[TEST_N]:0b10110;
     let ref_priority_order = uN[TEST_INDEX_WIDTH][TEST_N]:[4, 3, 0, 2, 1];
     let grant = bits[TEST_N]:0b00010;
@@ -146,7 +147,7 @@ fn test_highest_priority_is_granted_false() {
 
 // Tests the array_contains test helper function.
 #[test]
-fn test_array_contains() {
+fn test_helper_array_contains() {
     type Index = uN[TEST_INDEX_WIDTH];
     let state = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 1, 2, 3, 4];
     assert_eq(array_contains(state, Index:1, u32:0), true);
@@ -154,7 +155,7 @@ fn test_array_contains() {
     assert_eq(array_contains(state, Index:3, u32:2), true);
     assert_eq(array_contains(state, Index:4, u32:3), true);
     assert_eq(array_contains(state, Index:0, u32:4), true);
-    
+
     let state = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 1, 3, 3, 4];
     assert_eq(array_contains(state, Index:3, u32:2), true);
     assert_eq(array_contains(state, Index:5, u32:0), false);
@@ -162,7 +163,7 @@ fn test_array_contains() {
 
 // Tests the state_unique_indices test helper function.
 #[test]
-fn test_state_unique_indices() {
+fn test_helper_state_unique_indices() {
     let state = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 1, 2, 3, 4];
     assert_eq(state_unique_indices(state), true);
 
@@ -175,13 +176,13 @@ fn test_state_unique_indices() {
 
 // Tests the any_state_out_of_range test helper function.
 #[test]
-fn test_any_state_out_of_range() {
+fn test_helper_any_state_out_of_range() {
     let state = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 1, 2, 3, 4];
     assert_eq(any_state_out_of_range(state), false);
-    
+
     let state = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 1, 2, 3, 5];
     assert_eq(any_state_out_of_range(state), true);
-    
+
     let state = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 7, 2, 3, 3];
     assert_eq(any_state_out_of_range(state), true);
 }
@@ -214,7 +215,7 @@ fn test_lru_arbiter() {
   let requests3 = bits[TEST_N]:0b0101;
   let (grant3, state) = lru_arbiter(requests3, state);
   assert_eq(grant3, bits[TEST_N]:0b0100);  // requestor 2 should be granted
-  
+
   // Test case 4: requestors 0 and 3 are requesting
   let requests4 = bits[TEST_N]:0b1001;
   let (grant4, state) = lru_arbiter(requests4, state);
@@ -226,17 +227,17 @@ fn test_lru_arbiter() {
   let requests5 = bits[TEST_N]:0b1111;
   let (grant5, state) = lru_arbiter(requests5, state);
   assert_eq(grant5, bits[TEST_N]:0b0010);  // requestor 1 should be granted
-  
+
   // Test case 6: requestors 0, 1, 2, and 3 are requesting
   let requests6 = bits[TEST_N]:0b1111;
   let (grant6, state) = lru_arbiter(requests6, state);
   assert_eq(grant6, bits[TEST_N]:0b0001);  // requestor 0 should be granted
-  
+
   // Test case 7: requestors 0, 1, 2, and 3 are requesting
   let requests7 = bits[TEST_N]:0b1111;
   let (grant7, state) = lru_arbiter(requests7, state);
   assert_eq(grant7, bits[TEST_N]:0b0100);  // requestor 2 should be granted
-  
+
   // Test case 8: requestors 0, 1, 2, and 3 are requesting
   let requests8 = bits[TEST_N]:0b1111;
   let (grant8, state) = lru_arbiter(requests8, state);
@@ -252,7 +253,7 @@ fn test_lru_arbiter() {
 
 // Tests the lru_arbiter function only grants at most one requestor.
 #[quickcheck]
-fn quickcheck_grant_onehot0(requests: bits[TEST_N], state: uN[TEST_INDEX_WIDTH][TEST_N]) -> bool {
+fn quickcheck_lru_arbiter_grant_onehot0(requests: bits[TEST_N], state: uN[TEST_INDEX_WIDTH][TEST_N]) -> bool {
     if any_state_out_of_range(state) || !state_unique_indices(state) {
         true
     } else {
@@ -268,7 +269,7 @@ fn quickcheck_grant_onehot0(requests: bits[TEST_N], state: uN[TEST_INDEX_WIDTH][
 
 // Tests the lru_arbiter function only grants at a requested index.
 #[quickcheck]
-fn quickcheck_grant_valid_index(requests: bits[TEST_N], state: uN[TEST_INDEX_WIDTH][TEST_N]) -> bool {
+fn quickcheck_lru_arbiter_grant_valid_index(requests: bits[TEST_N], state: uN[TEST_INDEX_WIDTH][TEST_N]) -> bool {
     if any_state_out_of_range(state) || !state_unique_indices(state) {
         true
     } else {
@@ -279,7 +280,7 @@ fn quickcheck_grant_valid_index(requests: bits[TEST_N], state: uN[TEST_INDEX_WID
 
 // Tests the lru_arbiter function only grants the highest priority active requestor.
 #[quickcheck]
-fn quickcheck_grant_highest_priority(requests: bits[TEST_N], state: uN[TEST_INDEX_WIDTH][TEST_N]) -> bool {
+fn quickcheck_lru_arbiter_grant_highest_priority(requests: bits[TEST_N], state: uN[TEST_INDEX_WIDTH][TEST_N]) -> bool {
     if any_state_out_of_range(state) || !state_unique_indices(state) {
         true
     } else {
@@ -289,4 +290,3 @@ fn quickcheck_grant_highest_priority(requests: bits[TEST_N], state: uN[TEST_INDE
 }
 
 ```
-
