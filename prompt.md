@@ -523,6 +523,30 @@ fn test_update_bits() {
 }
 ```
 
+**Bit Slice Updates** Note that we use the builtin `bit_slice_update(orig: bits[N], position, update_value: bits[M]) -> bits[N]` to update a (sub)slice of a bit vector where `M <= N` -- `update` is just for arrays. Relatedly, we use `std::convert_to_*` routines to help convert between `bits`-typed values and bool arrays with "self documenting" conventions on which array index is the most and least significant bit:
+
+```dslx
+import std;
+
+#[test]
+fn show_update_vs_bit_slice_update() {
+    let b = u4:0b10_10;
+    let b_updated = bit_slice_update(b, u32:0, u2:0b11);
+    assert_eq(b_updated, u4:0b10_11);
+
+    let a = bool[4]:[1, 0, 1, 0];
+    assert_eq(a, array_rev(std::convert_to_bools_lsb0(b)));
+
+    let a_updated = update(a, u32:1, true);
+    assert_eq(a_updated, bool[4]:[1, 1, 1, 0]);
+
+    // Show conversion routines for the case where we hold the most significant bit at index 0
+    // in the array.
+    assert_eq(std::convert_to_bits_msb0(a), u4:0b1010);
+    assert_eq(std::convert_to_bits_msb0(a_updated), u4:0b1110);
+}
+```
+
 **Match Construct** Pattern matching in DSLX is similar to Rust's, it just supports a subset of patterns that Rust supports. Prefer to use match expressions instead of if/else ladders. Tuples and constants can notably be pattern matched on:
 
 ```dslx
