@@ -29,7 +29,9 @@ fn lru_arbiter<N: u32>(requests: bits[N], state: u32[N]) -> (bits[N], u32[N])
 #[test]
 fn test_lru_arbiter() {
   const TEST_N = u32:4;
-  let state = u32[TEST_N]:[0, 1, 2, 3];
+  const TEST_INDEX_WIDTH = std::clog2(TEST_N);
+
+  let state = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 1, 2, 3];
 
   // Test case 1: requestors 1 and 3 are requesting
   let requests1 = bits[TEST_N]:0b1010;
@@ -93,18 +95,18 @@ fn granted_at_requested_index<N: u32>(req: bits[N], grant: bits[N]) -> bool {
 // Returns true iff:
 // - the highest priority requested index was the granted index, OR
 // - there was no request and concordantly no grant
-fn highest_priority_is_granted<N: u32>(req: bits[N], ref_priority_order: u32[N], grant: bits[N]) -> bool {
+fn highest_priority_is_granted<N: u32, IndexWidth: u32 = {std::clog2(N)}>(req: bits[N], ref_priority_order: uN[IndexWidth][N], grant: bits[N]) -> bool {
+  type Index = uN[IndexWidth];
   let (grant_found, grant_index) = std::find_index(std::convert_to_bools_lsb0(grant), true);
+  let grant_index = grant_index as Index;
   let req = std::convert_to_bools_lsb0(req);
-  let req_index: u32 = for (element, saved_index): (u32, u32) in ref_priority_order {
-    let saved_index_next = if req[element] == true && saved_index == u32::MAX {
-      element
+  let (req_found, req_index): (bool, Index) = for (element, (saved_req_found, saved_index)): (Index, (bool, Index)) in ref_priority_order {
+    if !saved_req_found && req[element] {
+        (true, element)
     } else {
-      saved_index
-    };
-    saved_index_next
-  }(u32::MAX);
-  let req_found = req_index != u32::MAX;
+        (saved_req_found, saved_index)
+    }
+  }((false, Index:0));
   if req_found {
     grant_found && grant_index == req_index
   } else {
@@ -113,6 +115,7 @@ fn highest_priority_is_granted<N: u32>(req: bits[N], ref_priority_order: u32[N],
 }
 
 const TEST_N = u32:5;
+const TEST_INDEX_WIDTH = std::clog2(TEST_N);
 
 #[quickcheck]
 fn quickcheck_granted_at_requested_index(req: bits[TEST_N], grant: bits[TEST_N]) -> bool {
@@ -129,57 +132,93 @@ fn quickcheck_granted_at_requested_index(req: bits[TEST_N], grant: bits[TEST_N])
 
 #[test]
 fn test_highest_priority_is_granted_true() {
-    const TEST_N = u32:4;
-
-    let req = bits[TEST_N]:0b1111;
-    let ref_priority_order = u32[TEST_N]:[0, 1, 2, 3];
-    let grant = bits[TEST_N]:0b0001;
+    let req = bits[TEST_N]:0b11111;
+    let ref_priority_order = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 1, 2, 3, 4];
+    let grant = bits[TEST_N]:0b00001;
     assert_eq(highest_priority_is_granted(req, ref_priority_order, grant), true);
     
-    let req = bits[TEST_N]:0b1111;
-    let ref_priority_order = u32[TEST_N]:[3, 0, 1, 2];
-    let grant = bits[TEST_N]:0b1000;
+    let req = bits[TEST_N]:0b11111;
+    let ref_priority_order = uN[TEST_INDEX_WIDTH][TEST_N]:[4, 0, 1, 2, 3];
+    let grant = bits[TEST_N]:0b10000;
     assert_eq(highest_priority_is_granted(req, ref_priority_order, grant), true);
     
-    let req = bits[TEST_N]:0b0000;
-    let ref_priority_order = u32[TEST_N]:[3, 0, 1, 2];
-    let grant = bits[TEST_N]:0b0000;
+    let req = bits[TEST_N]:0b00000;
+    let ref_priority_order = uN[TEST_INDEX_WIDTH][TEST_N]:[3, 0, 1, 2, 4];
+    let grant = bits[TEST_N]:0b00000;
     assert_eq(highest_priority_is_granted(req, ref_priority_order, grant), true);
 }
     
 #[test]
 fn test_highest_priority_is_granted_false() {
-    const TEST_N = u32:4;
-
-    let req = bits[TEST_N]:0b0110;
-    let ref_priority_order = u32[TEST_N]:[3, 0, 2, 1];
-    let grant = bits[TEST_N]:0b0010;
+    let req = bits[TEST_N]:0b00110;
+    let ref_priority_order = uN[TEST_INDEX_WIDTH][TEST_N]:[4, 3, 0, 2, 1];
+    let grant = bits[TEST_N]:0b00010;
     assert_eq(highest_priority_is_granted(req, ref_priority_order, grant), false);
     
-    let req = bits[TEST_N]:0b0110;
-    let ref_priority_order = u32[TEST_N]:[3, 0, 2, 1];
-    let grant = bits[TEST_N]:0b0001;
+    let req = bits[TEST_N]:0b10110;
+    let ref_priority_order = uN[TEST_INDEX_WIDTH][TEST_N]:[4, 3, 0, 2, 1];
+    let grant = bits[TEST_N]:0b00010;
     assert_eq(highest_priority_is_granted(req, ref_priority_order, grant), false);
 }
 
-#[quickcheck]
-fn quickcheck_grant_onehot0(requests: bits[TEST_N], state: u32[TEST_N]) -> bool {
-    let want = requests != bits[TEST_N]:0;
-    let (granted, _) = lru_arbiter(requests, state);
-    std::popcount(granted) == (want as bits[TEST_N])
+// Returns true iff any state[i] is >= N
+fn any_state_out_of_range<N: u32, IndexWidth: u32 = {std::clog2(N)}>(state: uN[IndexWidth][N]) -> bool {
+    let result: bool = for (s, r): (uN[IndexWidth], bool) in state {
+        let r_next = if s >= N as uN[IndexWidth] {
+            true
+        } else {
+            r
+        };
+        r_next
+    }(false);
+    result
+}
+
+#[test]
+fn test_any_state_out_of_range() {
+    let state = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 1, 2, 3, 4];
+    assert_eq(any_state_out_of_range(state), false);
+    
+    let state = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 1, 2, 3, 5];
+    assert_eq(any_state_out_of_range(state), true);
+    
+    let state = uN[TEST_INDEX_WIDTH][TEST_N]:[0, 7, 2, 3, 3];
+    assert_eq(any_state_out_of_range(state), true);
 }
 
 #[quickcheck]
-fn quickcheck_grant_valid_index(requests: bits[TEST_N], state: u32[TEST_N]) -> bool {
-    let (granted, _) = lru_arbiter(requests, state);
-    granted_at_requested_index<TEST_N>(requests, granted)
+fn quickcheck_grant_onehot0(requests: bits[TEST_N], state: uN[TEST_INDEX_WIDTH][TEST_N]) -> bool {
+    if any_state_out_of_range(state) {
+        true
+    } else {
+        let any_requests: bool = requests != bits[TEST_N]:0;
+        let (granted, _) = lru_arbiter(requests, state);
+        if any_requests {
+            std::popcount(granted) == uN[TEST_N]:1
+        } else {
+            granted == uN[TEST_N]:0
+        }
+    }
 }
 
 #[quickcheck]
-fn quickcheck_grant_highest_priority(requests: bits[TEST_N], state: u32[TEST_N]) -> bool {
-    let (granted, _) = lru_arbiter(requests, state);
-    highest_priority_is_granted<TEST_N>(requests, state, granted)
+fn quickcheck_grant_valid_index(requests: bits[TEST_N], state: uN[TEST_INDEX_WIDTH][TEST_N]) -> bool {
+    if any_state_out_of_range(state) {
+        true
+    } else {
+        let (granted, _) = lru_arbiter(requests, state);
+        granted_at_requested_index<TEST_N>(requests, granted)
+    }
 }
 
+#[quickcheck]
+fn quickcheck_grant_highest_priority(requests: bits[TEST_N], state: uN[TEST_INDEX_WIDTH][TEST_N]) -> bool {
+    if any_state_out_of_range(state) {
+        true
+    } else {
+        let (granted, _) = lru_arbiter(requests, state);
+        highest_priority_is_granted<TEST_N>(requests, state, granted)
+    }
+}
 ```
 
