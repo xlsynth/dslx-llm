@@ -162,13 +162,23 @@ fn test_highest_priority_is_granted_false() {
     assert_eq(highest_priority_is_granted(req, ref_priority_order, grant), false);
 }
 
-// Validates that the output is onehot and that a grant is always performed
-// when there is >= 1 request for arb and it came from a requested index.
 #[quickcheck]
-fn quickcheck_grant_onehot(requests: bits[TEST_N], state: u32[TEST_N]) -> bool {
+fn quickcheck_grant_onehot0(requests: bits[TEST_N], state: u32[TEST_N]) -> bool {
     let want = requests != bits[TEST_N]:0;
-    let (granted, _state') = lru_arbiter(requests, state);
-    std::popcount(granted) == (want as bits[TEST_N]) && granted_at_requested_index<TEST_N>(requests, granted) && highest_priority_is_granted<TEST_N>(requests, state, granted)
+    let (granted, _) = lru_arbiter(requests, state);
+    std::popcount(granted) == (want as bits[TEST_N])
+}
+
+#[quickcheck]
+fn quickcheck_grant_valid_index(requests: bits[TEST_N], state: u32[TEST_N]) -> bool {
+    let (granted, _) = lru_arbiter(requests, state);
+    granted_at_requested_index<TEST_N>(requests, granted)
+}
+
+#[quickcheck]
+fn quickcheck_grant_highest_priority(requests: bits[TEST_N], state: u32[TEST_N]) -> bool {
+    let (granted, _) = lru_arbiter(requests, state);
+    highest_priority_is_granted<TEST_N>(requests, state, granted)
 }
 
 ```
