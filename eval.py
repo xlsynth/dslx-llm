@@ -248,7 +248,7 @@ def get_sample_choices() -> list[str]:
 
 def main() -> None:
     """Main function to evaluate all samples."""
-    MODEL_CHOICES = ['gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o1-preview', 'o3-mini']
+    MODEL_CHOICES = ['gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o1-preview', 'o1', 'o3-mini']
 
     parser = optparse.OptionParser()
     parser.add_option('--model', default=None, choices=MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(MODEL_CHOICES))
