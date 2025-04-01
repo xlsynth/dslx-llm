@@ -20,17 +20,13 @@ The prologue will be automatically included, just implement the signature in the
 ## Signature
 
 ```dslx-snippet
-fn lru_arbiter<N: u32, IndexWidth: u32 = {std::clog2(N)}>(requests: bits[N], state: uN[IndexWidth][N]) -> (bits[N], uN[IndexWidth][N])
+fn lru_arbiter<N: u32, INDEX_WIDTH: u32 = {std::clog2(N)}>(requests: bits[N], state: uN[INDEX_WIDTH][N]) -> (bits[N], uN[INDEX_WIDTH][N])
 ```
 
 ## Tests
 
 ```dslx-snippet
-///////////////////////////
-///////////////////////////
-// TEST HELPER FUNCTIONS //
-///////////////////////////
-///////////////////////////
+// -- test helpers
 
 /// Returns true iff we gave a grant an index where req was true.
 fn granted_at_requested_index<N: u32>(req: bits[N], grant: bits[N]) -> bool {
@@ -45,8 +41,8 @@ fn granted_at_requested_index<N: u32>(req: bits[N], grant: bits[N]) -> bool {
 // Returns true iff:
 // - the highest priority requested index was the granted index, OR
 // - there was no request and concordantly no grant
-fn highest_priority_is_granted<N: u32, IndexWidth: u32 = {std::clog2(N)}>(req: bits[N], ref_priority_order: uN[IndexWidth][N], grant: bits[N]) -> bool {
-  type Index = uN[IndexWidth];
+fn highest_priority_is_granted<N: u32, INDEX_WIDTH: u32 = {std::clog2(N)}>(req: bits[N], ref_priority_order: uN[INDEX_WIDTH][N], grant: bits[N]) -> bool {
+  type Index = uN[INDEX_WIDTH];
   let (grant_found, grant_index) = std::find_index(std::convert_to_bools_lsb0(grant), true);
   let grant_index = grant_index as Index;
   let req = std::convert_to_bools_lsb0(req);
@@ -65,9 +61,9 @@ fn highest_priority_is_granted<N: u32, IndexWidth: u32 = {std::clog2(N)}>(req: b
 }
 
 // Returns true iff any state[i] is >= N
-fn any_state_out_of_range<N: u32, IndexWidth: u32 = {std::clog2(N)}>(state: uN[IndexWidth][N]) -> bool {
-    let result: bool = for (s, r): (uN[IndexWidth], bool) in state {
-        let r_next = if s >= N as uN[IndexWidth] {
+fn any_state_out_of_range<N: u32, INDEX_WIDTH: u32 = {std::clog2(N)}>(state: uN[INDEX_WIDTH][N]) -> bool {
+    let result: bool = for (s, r): (uN[INDEX_WIDTH], bool) in state {
+        let r_next = if s >= N as uN[INDEX_WIDTH] {
             true
         } else {
             r
@@ -78,7 +74,7 @@ fn any_state_out_of_range<N: u32, IndexWidth: u32 = {std::clog2(N)}>(state: uN[I
 }
 
 // Returns true if lookup is in arr except at location except_index.
-fn array_contains<N: u32, IndexWidth: u32 = {std::clog2(N)}>(arr: uN[IndexWidth][N], lookup: uN[IndexWidth], except_index: u32) -> bool {
+fn array_contains<N: u32, INDEX_WIDTH: u32 = {std::clog2(N)}>(arr: uN[INDEX_WIDTH][N], lookup: uN[INDEX_WIDTH], except_index: u32) -> bool {
     let contains = for (i, saved_contains): (u32, bool) in u32:0..N {
         saved_contains || ((except_index != i) && (lookup == arr[i]))
     }(false);
@@ -86,7 +82,7 @@ fn array_contains<N: u32, IndexWidth: u32 = {std::clog2(N)}>(arr: uN[IndexWidth]
 }
 
 // Returns true iff all state[i] are unique.
-fn state_unique_indices<N: u32, IndexWidth: u32 = {std::clog2(N)}>(state: uN[IndexWidth][N]) -> bool {
+fn state_unique_indices<N: u32, INDEX_WIDTH: u32 = {std::clog2(N)}>(state: uN[INDEX_WIDTH][N]) -> bool {
     let outer_unique = for (i, saved_outer_unique): (u32, bool) in u32:0..N {
         let inner_unique = !array_contains(state, state[i], i);
         saved_outer_unique && inner_unique
@@ -187,11 +183,9 @@ fn test_helper_any_state_out_of_range() {
     assert_eq(any_state_out_of_range(state), true);
 }
 
-///////////////////////////
-///////////////////////////
-//        TESTS          //
-///////////////////////////
-///////////////////////////
+
+// -- tests
+
 
 // Tests the lru_arbiter function with 4 requestors on a specific sequence.
 #[test]
