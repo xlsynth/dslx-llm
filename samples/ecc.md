@@ -3,8 +3,8 @@
 ## Prompt
 
 Write an error-correcting code that implements a single-error-correcting, double-error-detecting (SECDED) behavior for a K-bit message.
-You are free to decide the code construction, including the number of parity bits (R), with the requirement that the code is in systematic form.
-A codeword is N = K + R bits long and is formed by concatenating the message with the generated parity bits.
+You are free to decide the code construction, as long as the code is in systematic form and codewords are N = K + R bits long, where R is the number of parity bits.
+Systematic form means codewords are encoded by concatenating the message with the generated parity bits.
 
 Codewords may be corrupted by bit flips outside of your control.
 The SECDED code must correct all single-bit flips, detect (but not correct) all double-bit flips, and either detect or attempt to correct all triple-bit flips (they cannot go undetected).
