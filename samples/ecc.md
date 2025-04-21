@@ -2,7 +2,7 @@
 
 ## Prompt
 
-Write an error-correcting code that implements a single-error-correcting, double-error-detecting (SECDED) behavior for a K=64-bit message.
+Write an error-correcting code that implements a single-error-correcting, double-error-detecting (SECDED) behavior for a K-bit message.
 You are free to decide the code construction, including the number of parity bits (R), with the requirement that the code is in systematic form.
 A codeword is N = K + R bits long and is formed by concatenating the message with the generated parity bits.
 
@@ -12,13 +12,16 @@ The SECDED code must correct all single-bit flips, detect (but not correct) all 
 Your task is to design the code construction and implement the encoder and decoder pair for that construction.
 You do not control the channel between the encoder and decoder, i.e., you will never be told whether any bits are flipped, nor their potential locations.
 
+You only need to implement for the following code parameters:
+* K = 64
+* R = 8
+* N = 72
+
 The prologue will be automatically included, just implement the signature in the output answer.
 
 ## Prologue
 
 ```dslx
-import std;
-
 // Instance parameters for the (72,64) SECDED code.
 const K = u32:64;
 const R = u32:8;
@@ -27,7 +30,7 @@ const N = K + R;
 
 ## Signature
 
-```dslx
+```dslx-snippet
 // Encodes a K-bit message into an N-bit codeword in systematic form.
 fn ecc_encoder(message: bits[K]) -> bits[N]
 

@@ -50,17 +50,22 @@ class CodeSample:
 
 def create_sample_with_stub(filename: str, md_content: str) -> CodeSample:
     """Creates a sample with a stub for the DSLX code sample."""
-    # Extract the signature -- it lives in the subsection called '## Signature'
-    # Within a fence in that section marked '```dslx-snippet'
-    signature_re = re.compile(r'^## Signature\s*\n(.*?)^##', re.DOTALL | re.MULTILINE)
-    signature_match = signature_re.search(md_content)
-    if not signature_match:
-        raise ValueError(f'No signature found in {filename}')
-    signature = signature_match.group(1)
-    signature = signature.replace('```dslx-snippet', '')
-    signature = signature.replace('```', '')
-    signature = signature.strip()
-    signatures = signature.splitlines()
+    # Extract signature section and parse all function signatures.
+    signature_section_re = re.compile(r'^## Signature\s*\n(.*?)(?=^##|\Z)', re.DOTALL | re.MULTILINE)
+    signature_section_match = signature_section_re.search(md_content)
+    if not signature_section_match:
+        raise ValueError(f'No signature section found in {filename}')
+    signature_section = signature_section_match.group(1)
+    # Extract code fence for signature, supporting both 'dslx-snippet' and 'dslx'
+    sig_code_re = re.compile(r'^```dslx(?:-snippet)?\s*\n(.*?)^```', re.DOTALL | re.MULTILINE)
+    sig_code_match = sig_code_re.search(signature_section)
+    if not sig_code_match:
+        raise ValueError(f'No signature code fence found in {filename}')
+    sig_code = sig_code_match.group(1).strip()
+    # Extract individual function signatures (lines starting with 'fn ')
+    signatures = [line.strip() for line in sig_code.splitlines() if line.strip().startswith('fn ')]
+    if not signatures:
+        raise ValueError(f'No function signatures found in {filename}')
 
     # See if there is a Prologue section, if so we extract that to include before the stubs.
     prologue_re = re.compile(r'^## Prologue\s*\n(.*?)^##', re.DOTALL | re.MULTILINE)
@@ -86,19 +91,17 @@ def create_sample_with_stub(filename: str, md_content: str) -> CodeSample:
     tests = tests.replace('```', '')
     tests = tests.strip()
 
-    # Create a stub for the signature that looks like:
-    # $SIGNATURE { fail!("unimplemented", zero!<ReturnType>()) }
-    # This means we have to hackily parse the return type out of the signature, but that's not too bad because it's after the arrow.
-    return_type_re = re.compile(r'->\s*(.*)')
-    return_type_match = return_type_re.search(signature)
-    if not return_type_match:
-        raise ValueError(f'No return type found in {filename}')
-    return_type = return_type_match.group(1)
-
+    # Create stubs for each signature, parsing the return type per function.
+    return_type_re = re.compile(r'->\s*(.*)$')
     stub_lines: list[str] = []
-    for signature in signatures:
-        stub_lines.append(f'{signature} {{ fail!("unimplemented", zero!<{return_type}>()) }}\n')
-    stubs: str = '\n'.join(stub_lines)
+    for sig_line in signatures:
+        rt_match = return_type_re.search(sig_line)
+        if not rt_match:
+            raise ValueError(f'No return type found in signature line: {sig_line}')
+        return_type = rt_match.group(1).strip()
+        stub_lines.append(f'{sig_line} {{ fail!("unimplemented", zero!<{return_type}>()) }}')
+    # Separate stubs by blank lines for readability.
+    stubs: str = '\n\n'.join(stub_lines)
 
     return CodeSample(name=os.path.splitext(filename)[0], content=f'import std;\n{prologue}\n{stubs}\n{tests}')
 
