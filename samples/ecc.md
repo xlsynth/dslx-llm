@@ -91,4 +91,11 @@ fn quickcheck_triple_bit_error_not_undetected(message: bits[K], pos0: u32, pos1:
         true
     }
 }
+
+// Tests that the code is in systematic form (first K bits of the encoded codeword match the message).
+#[quickcheck]
+fn quickcheck_systematic(message: bits[K]) -> bool {
+    let codeword = ecc_encoder(message);
+    message == codeword[0 +: uN[K]]
+}
 ```
