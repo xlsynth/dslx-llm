@@ -78,10 +78,10 @@ class CodeGenerator:
         ]
 
     def _get_chat_kwargs(self):
-        if self.model == 'o3-mini':
+        if self.model == 'o3-mini' or self.model == 'o4-mini':
             assert self.reasoning_effort is not None
             return {
-                'model': 'o3-mini',
+                'model': self.model,
                 'reasoning_effort': self.reasoning_effort,
                 'messages': self.messages,
             }
@@ -198,7 +198,7 @@ def evaluate_sample(sample_path: Path, model: str, *, reasoning_effort: Optional
 
         feedback_from_last_iteration = None
         first_attempt_success = False
-        for attempt in range(1, max_retries + 1):
+        for attempt in range(1, max(1, max_retries) + 1):
             print(f"🤖 Attempt {attempt}:")
             if feedback_from_last_iteration is not None:
                 generated_code = codegen.provide_feedback('```\n' + feedback_from_last_iteration + '\n```\n')
@@ -248,7 +248,20 @@ def get_sample_choices() -> list[str]:
 
 def main() -> None:
     """Main function to evaluate all samples."""
-    MODEL_CHOICES = ['gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o1-preview', 'o1', 'o3-mini']
+    MODEL_CHOICES = [
+        'gpt-3.5-turbo',
+        'gpt-4o-mini',
+        'gpt-4o',
+        'o1-preview',
+        'o1-mini',
+        'o1',
+        'o1-pro',
+        'o3-mini',
+        'o3',
+        'o4-mini',
+        'gpt-4.1',
+        'gpt-4.1-mini',
+    ]
 
     parser = optparse.OptionParser()
     parser.add_option('--model', default=None, choices=MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(MODEL_CHOICES))
