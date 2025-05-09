@@ -48,27 +48,27 @@ def extract_fn_name_and_args(signature: str):
     args = m.group(2).strip()
     return fn_name, args
 
-def make_equiv_quickcheck(ref_name: str, cand_name: str, args: str) -> str:
+def make_equiv_quickcheck_modular(ref_mod: str, cand_mod: str, fn_name: str, args: str) -> str:
     # args: 'a: u32, b: u32' -> 'a, b'
     arg_names = [a.split(':')[0].strip() for a in args.split(',') if a.strip()]
     arglist = ', '.join(arg_names)
     return f"""
 #[quickcheck]
 fn prop_equiv({args}) -> bool {{
-    {ref_name}({arglist}) == {cand_name}({arglist})
+    {ref_mod}::{fn_name}({arglist}) == {cand_mod}::{fn_name}({arglist})
 }}
 """
 
-def run_prove_quickcheck(dslx_path: str, quickcheck_name: str) -> tuple[bool, str]:
+def run_prove_quickcheck(dslx_path: str, quickcheck_name: str, cwd: Optional[str] = None) -> tuple[bool, str, str]:
     cmd = [
         os.path.join(os.environ['XLSYNTH_TOOLS'], 'prove_quickcheck_main'),
         dslx_path,
         '--dslx_stdlib_path', tools.DSLX_STDLIB_PATH,
         '--test_filter', quickcheck_name
     ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd)
     success = result.returncode == 0
-    return success, result.stdout + result.stderr
+    return success, result.stdout + result.stderr, ' '.join(cmd)
 
 # -- Prompt construction
 def make_prompt(verilog: str, reference_x: str, signature: str, suggestion: Optional[str] = None) -> str:
@@ -111,6 +111,11 @@ def run_dslx_check(generated_code: str, signature: str, tests: str, tmpdir: str)
     success = 'error' not in result.lower()
     return success, result
 
+def extract_imports_and_types(dslx_code: str) -> str:
+    lines = dslx_code.splitlines()
+    relevant = [line for line in lines if line.strip().startswith('import ') or line.strip().startswith('type ')]
+    return '\n'.join(relevant)
+
 # -- Main logic
 def main():
     parser = optparse.OptionParser()
@@ -138,66 +143,81 @@ def main():
     codegen = CodeGenerator(opts.model, opts.reasoning_effort, prompt)
 
     ref_fn_name, ref_args = extract_fn_name_and_args(signature)
-    cand_fn_name = 'candidate'  # We'll rename the generated function to this
+    cand_fn_name = ref_fn_name  # Use the same name for candidate for modular import
 
     with tempfile.TemporaryDirectory(suffix='-v2x', delete=False) as tmpdir:
-        feedback = None
+        feedback_history = []
         attempt = 1
         while True:
             print(f"🤖 Attempt {attempt}:")
-            if feedback:
-                generated_code = codegen.provide_feedback('``\n' + feedback + '\n``\n')
+            if feedback_history:
+                feedback_text = ''
+                for idx, (proposal, error) in enumerate(feedback_history, 1):
+                    feedback_text += f"\n--- Attempt {idx} proposal ---\n{proposal}\n\n--- Attempt {idx} error ---\n{error}\n"
+                generated_code = codegen.provide_feedback(feedback_text)
             else:
                 generated_code = codegen.generate_code(prompt, signature)
-            termcolor.cprint('<<GENERATED', color='blue')
+            # Write candidate.x (rename function to match reference)
+            cand_code = strip_fences(generated_code)
+            cand_code_renamed = re.sub(r'(?:pub\s+)?fn\s+\w+', f'pub fn {cand_fn_name}', cand_code, count=1)
+            cand_path = os.path.join(tmpdir, 'candidate.x')
+            with open(cand_path, 'w') as f:
+                f.write(cand_code_renamed)
+            termcolor.cprint(f'<<GENERATED > {cand_path}', color='blue')
             print(generated_code)
             termcolor.cprint('GENERATED', color='blue')
-            # Accept if it typechecks and passes tests
             success, result = run_dslx_check(generated_code, signature, tests, tmpdir)
             if not success:
                 print(f"❌ Error on attempt {attempt}")
                 termcolor.cprint('<<OUTPUT', color='blue')
                 print(result)
                 termcolor.cprint('OUTPUT', color='blue')
-                feedback = result
+                feedback_history.append((generated_code, result))
                 attempt += 1
                 continue
-            # If --prove, require equivalence proof
             if opts.prove:
-                # Compose a combined DSLX file with both functions and the quickcheck
+                # Write reference.x
+                ref_path = os.path.join(tmpdir, 'reference.x')
                 ref_code = strip_fences(reference_x)
+                with open(ref_path, 'w') as f:
+                    f.write(ref_code)
+                # Write candidate.x (rename function to match reference)
                 cand_code = strip_fences(generated_code)
-                # Rename candidate function to 'candidate'
-                cand_code_renamed = re.sub(r'(?:pub\s+)?fn\s+\w+', f'fn {cand_fn_name}', cand_code, count=1)
-                quickcheck = make_equiv_quickcheck(ref_fn_name, cand_fn_name, ref_args)
-                combined = f"import std;\n\n{ref_code}\n\n{cand_code_renamed}\n\n{quickcheck}"
+                cand_code_renamed = re.sub(r'(?:pub\s+)?fn\s+\w+', f'pub fn {cand_fn_name}', cand_code, count=1)
+                cand_path = os.path.join(tmpdir, 'candidate.x')
+                with open(cand_path, 'w') as f:
+                    f.write(cand_code_renamed)
+                # Extract imports/types from reference for scaffolding
+                ref_imports_types = extract_imports_and_types(ref_code)
+                # Write prove_equiv.x
+                quickcheck = make_equiv_quickcheck_modular('reference', 'candidate', cand_fn_name, ref_args)
+                combined = f"import std;\n{ref_imports_types}\nimport reference;\nimport candidate;\n\n{quickcheck}"
                 combined_path = os.path.join(tmpdir, 'prove_equiv.x')
                 with open(combined_path, 'w') as f:
                     f.write(combined)
                 print('Running equivalence proof...')
-                proof_success, proof_output = run_prove_quickcheck(combined_path, 'prop_equiv')
+                proof_success, proof_output, proof_cmd = run_prove_quickcheck(combined_path, 'prop_equiv', cwd=tmpdir)
+                print(f"Prover command: {proof_cmd}")
                 if proof_success:
                     print(f"✅ Equivalence proof succeeded on attempt {attempt}")
                     print(generated_code)
-                    # Save the final candidate to a file
-                    final_path = os.path.join(tmpdir, 'final_candidate.x')
-                    with open(final_path, 'w') as f:
-                        f.write(strip_fences(generated_code))
-                    print(f"Final accepted candidate written to: {final_path}")
+                    # Save the final proof file as the result
+                    final_path = combined_path
+                    print(f"Final accepted (proved) candidate written to: {final_path}")
                     print("Proof output confirming equivalence:")
                     print(proof_output)
                     return
                 else:
                     print(f"❌ Equivalence proof failed on attempt {attempt}")
+                    print(f"Prover command: {proof_cmd}")
                     termcolor.cprint('<<PROOF OUTPUT', color='blue')
                     print(proof_output)
                     termcolor.cprint('PROOF OUTPUT', color='blue')
-                    feedback = proof_output
+                    feedback_history.append((generated_code, proof_output))
                     attempt += 1
                     continue
             print(f"✅ Success on attempt {attempt}")
             print(generated_code)
-            # Save the final candidate to a file
             final_path = os.path.join(tmpdir, 'final_candidate.x')
             with open(final_path, 'w') as f:
                 f.write(strip_fences(generated_code))
