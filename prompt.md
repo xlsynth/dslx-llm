@@ -648,6 +648,33 @@ fn show_numeric_limits_uN_N() {
 }
 ```
 
+**APFloat: flatten/unflatten** To flatten a floating point value to a bit vector we can use `apfloat::flatten` or the corresponding `unflatten` for the target type:
+
+```dslx
+import apfloat;
+import float32;
+
+// This is an APFloat alias.
+type F32 = float32::F32;
+
+#[test]
+fn show_apfloat_flatten() {
+    const ONE: F32 = float32::one(false);
+
+    // Access the individual fields of the APFloat.
+    assert_eq(ONE.sign, false);
+    assert_eq(ONE.bexp, u8:127);
+    assert_eq(ONE.fraction, u23:0);
+
+    // Build one via the structure.
+    assert_eq(ONE, F32 {sign: false, bexp: u8:127, fraction: u23:0});
+
+    let f32_bits: bits[32] = apfloat::flatten(ONE);
+    assert_eq(f32_bits, u32:0x3f800000);
+    assert_eq(float32::unflatten(f32_bits), ONE)
+}
+```
+
 **Helpful-only guidance:** If you're unsure what the type of a particular sub-expression is, it can be useful to break the nested expression up into multiple expressions to help get early/explicit guidance on whether the type was as you were expecting. This can be particularly useful for parametric code.
 
 **That is all of the tutorial content.**
