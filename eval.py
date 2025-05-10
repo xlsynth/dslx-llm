@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Optional, List, Dict
+import re
 
 import openai
 import termcolor
@@ -128,10 +129,11 @@ class CodeGenerator:
 
 def strip_fences(text: str) -> str:
     text = text.strip()
-    if text.startswith('```'):
-        lines = text.splitlines()
-        assert lines[-1] == '```'
-        text = '\n'.join(lines[1:-1])
+    # Match code block with or without language tag
+    m = re.search(r"```(?:[a-zA-Z0-9_-]*)?\n(.*?)```", text, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    # Fallback: if no code block, return the text as-is
     return text
 
 @dataclasses.dataclass
@@ -191,7 +193,7 @@ def evaluate_sample(sample_path: Path, model: str, *, reasoning_effort: Optional
     sample: Sample = parse_sample(sample_path)
     codegen = CodeGenerator(model, reasoning_effort, SYSTEM_PROMPT)
 
-    with tempfile.TemporaryDirectory(suffix=f'-{model}-{sample_filename}', delete=False) as tmpdir:
+    with tempfile.TemporaryDirectory(suffix=f'-{model}-{sample_filename}') as tmpdir:
         print('tmpdir:', tmpdir)
 
         all_generated = []

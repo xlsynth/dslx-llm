@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 import re
 import subprocess
+import difflib
 
 import termcolor
 import tools
@@ -79,16 +80,11 @@ Suggestion (previous best attempt):
 ```
 """ if suggestion else ""
     return f"""
-Translate the following Verilog module into a semantically identical DSLX function. The generated DSLX function MUST closely mirror the structure and logic of the Verilog module, not just its behavior. Use the provided signature. Do not include any tests or explanations.
+Translate the following Verilog module into a semantically identical DSLX function. The generated DSLX function MUST closely mirror the structure and logic of the Verilog module, not just its behavior. Use the provided signature. Do not include any tests or explanations. **Output ONLY the DSLX code, with no textual explanation or commentary, as your output will be piped directly into a tool for evaluation.**
 
 Verilog:
 ```
 {verilog}
-```
-
-Reference DSLX:
-```
-{reference_x}
 ```
 {suggestion_block}
 Signature:
@@ -146,14 +142,23 @@ def main():
     cand_fn_name = ref_fn_name  # Use the same name for candidate for modular import
 
     with tempfile.TemporaryDirectory(suffix='-v2x', delete=False) as tmpdir:
-        feedback_history = []
+        error_history = []
+        MAX_ERRORS = 5
+        MAX_ERROR_CHARS = 2000
         attempt = 1
+        best_distance = None
+        best_candidate = None
+        best_proof_output = None
         while True:
-            print(f"🤖 Attempt {attempt}:")
-            if feedback_history:
+            error_chars = sum(len(e[:MAX_ERROR_CHARS]) for e in error_history[-MAX_ERRORS:])
+            print(f"🤖 Attempt {attempt}: [Temp directory: {tmpdir}] [Error chars in feedback: {error_chars}]")
+            if error_history:
                 feedback_text = ''
-                for idx, (proposal, error) in enumerate(feedback_history, 1):
-                    feedback_text += f"\n--- Attempt {idx} proposal ---\n{proposal}\n\n--- Attempt {idx} error ---\n{error}\n"
+                for idx, error in enumerate(error_history[-MAX_ERRORS:], 1):
+                    error_trunc = error[:MAX_ERROR_CHARS]
+                    feedback_text += f"\n--- Error on attempt {idx} ---\n{error_trunc}\n"
+                # Also include the latest generated response
+                feedback_text += f"\n--- Latest generated response ---\n{generated_code}\n"
                 generated_code = codegen.provide_feedback(feedback_text)
             else:
                 generated_code = codegen.generate_code(prompt, signature)
@@ -172,7 +177,7 @@ def main():
                 termcolor.cprint('<<OUTPUT', color='blue')
                 print(result)
                 termcolor.cprint('OUTPUT', color='blue')
-                feedback_history.append((generated_code, result))
+                error_history.append(result)
                 attempt += 1
                 continue
             if opts.prove:
@@ -199,21 +204,42 @@ def main():
                 proof_success, proof_output, proof_cmd = run_prove_quickcheck(combined_path, 'prop_equiv', cwd=tmpdir)
                 print(f"Prover command: {proof_cmd}")
                 if proof_success:
-                    print(f"✅ Equivalence proof succeeded on attempt {attempt}")
-                    print(generated_code)
-                    # Save the final proof file as the result
-                    final_path = combined_path
-                    print(f"Final accepted (proved) candidate written to: {final_path}")
-                    print("Proof output confirming equivalence:")
-                    print(proof_output)
-                    return
+                    # Compute Levenshtein distance
+                    ref_code_stripped = strip_fences(reference_x)
+                    cand_code_stripped = strip_fences(generated_code)
+                    sm = difflib.SequenceMatcher(None, ref_code_stripped, cand_code_stripped)
+                    distance = int((1 - sm.ratio()) * max(len(ref_code_stripped), len(cand_code_stripped)))
+                    print(f"Levenshtein distance to reference: {distance}")
+                    if best_distance is None or distance < best_distance:
+                        best_distance = distance
+                        best_candidate = generated_code
+                        best_proof_output = proof_output
+                    if distance == 0:
+                        print(f"✅ Equivalence proof succeeded with minimal distance on attempt {attempt}")
+                        print(generated_code)
+                        final_path = combined_path
+                        print(f"Final accepted (proved) candidate written to: {final_path}")
+                        print("Proof output confirming equivalence:")
+                        print(proof_output)
+                        return
+                    else:
+                        print(f"✅ Equivalence proof succeeded, but candidate is not textually identical to reference.")
+                        print(f"Levenshtein distance: {distance}")
+                        # Ask for a new candidate with smaller distance
+                        feedback_text = (
+                            f"The last candidate was correct, but its Levenshtein distance from the reference is {distance}. "
+                            f"Please generate a new candidate that is still equivalent but has a smaller Levenshtein distance to the reference.\n"
+                        )
+                        error_history.append(feedback_text)
+                        attempt += 1
+                        continue
                 else:
                     print(f"❌ Equivalence proof failed on attempt {attempt}")
                     print(f"Prover command: {proof_cmd}")
                     termcolor.cprint('<<PROOF OUTPUT', color='blue')
                     print(proof_output)
                     termcolor.cprint('PROOF OUTPUT', color='blue')
-                    feedback_history.append((generated_code, proof_output))
+                    error_history.append(proof_output)
                     attempt += 1
                     continue
             print(f"✅ Success on attempt {attempt}")
