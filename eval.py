@@ -11,6 +11,7 @@ from typing import Optional, List, Dict
 
 import openai
 import termcolor
+from tempcompat import TemporaryDirectory as CompatTemporaryDirectory
 
 import tools
 
@@ -191,7 +192,7 @@ def evaluate_sample(sample_path: Path, model: str, *, reasoning_effort: Optional
     sample: Sample = parse_sample(sample_path)
     codegen = CodeGenerator(model, reasoning_effort, SYSTEM_PROMPT)
 
-    with tempfile.TemporaryDirectory(suffix=f'-{model}-{sample_filename}', delete=False) as tmpdir:
+    with CompatTemporaryDirectory(suffix=f'-{model}-{sample_filename}', delete=False) as tmpdir:
         print('tmpdir:', tmpdir)
 
         all_generated = []
