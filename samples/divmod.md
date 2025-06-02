@@ -6,6 +6,8 @@ Write a divide unit implementation in DSLX as a function that provides both
 division and modulus results efficiently -- make it parameterized on bit count
 `N`.
 
+Describe in a comment which division algorithm you used for implementation.
+
 ## Sub-Prompts
 
 * Attempt to implement via a restoring division algorithm.

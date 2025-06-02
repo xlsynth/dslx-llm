@@ -12,6 +12,7 @@ import termcolor
 import tools
 
 from eval import CodeGenerator, strip_fences
+from tempcompat import TemporaryDirectory as CompatTemporaryDirectory
 
 # -- Helpers to read Verilog and reference DSLX files
 def read_file(path: str) -> str:
@@ -145,7 +146,7 @@ def main():
     ref_fn_name, ref_args = extract_fn_name_and_args(signature)
     cand_fn_name = ref_fn_name  # Use the same name for candidate for modular import
 
-    with tempfile.TemporaryDirectory(suffix='-v2x', delete=False) as tmpdir:
+    with CompatTemporaryDirectory(suffix='-v2x', delete=False) as tmpdir:
         feedback_history = []
         attempt = 1
         while True:
