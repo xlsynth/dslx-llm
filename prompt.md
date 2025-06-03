@@ -216,6 +216,19 @@ fn test_sum_to_u16() {
 }
 ```
 
+**Destructuring Tuple Type Syntax** Tuple type syntax for a destructuring assignment is the same as stable Rust, the tuple type annotation comes after the pattern binding:
+
+```dslx
+#[test]
+fn show_tuple_destructuring_with_type_annotation() {
+    let (x, y): (u32, u64) = (u32:42, u64:77);
+    assert_eq(x, u32:42);
+    assert_eq(y, u64:77);
+}
+```
+
+DSLX does **not** support "type ascription in patterns" (which is an unstable language feature in Rust).
+
 **Multi-Dimensional Array Types and Indexing** For multi-dimensional arrays in Rust we’d write `[[u8; 4]; 2]` but in DSLX we write `u8[4][2]`. Note **very well** that the `2` is the first dimension indexed in that DSLX type! Which is to say, the indexing works similarly to Rust, we index the outer array before indexing the inner array; i.e. we index the `2` dimension and we get a `u8[4]` and we can subsequently index that to get a single `u8`. Don't be fooled by the fact it looks more like C syntax, the first dimension written in the multi-dimensional array type is not the first dimension indexed.
 
 ```dslx
