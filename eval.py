@@ -225,17 +225,32 @@ def evaluate_sample(sample_path: Path, model: str, *, reasoning_effort: Optional
 
             all_generated.append(generated_code)
 
-            # Attempt to run tests; if we encounter malformed fences we will
-            # feed the error back to the model and retry (until max_retries).
+            # Pre-validate that the assistant surrounded the solution in a
+            # balanced triple-backtick block. If not, notify the model and
+            # retry without invoking the (potentially costly) DSLX toolchain.
             try:
-                run_result = run_dslx_tests(generated_code, sample, f'{sample_filename}-attempt-{attempt}', tmpdir)
+                _ = strip_fences(generated_code)
             except ValueError as e:
-                print('🛑 Malformed fenced block, requesting regeneration…')
-                feedback_from_last_iteration = str(e)
+                print('🛑 Malformed or unbalanced ``` fences: requesting regeneration…')
+                feedback_from_last_iteration = (
+                    'Your response did not include a *balanced* triple-backtick fenced code block. '
+                    'Error details: ' + str(e) + '\n'
+                    'Please output the DSLX solution wrapped in ``` fences as previously requested.'
+                )
                 continue
 
-            # Normal path: we got a run result; break evaluation loop logic
-            # below will handle success/failure.
+            # Fences look good → proceed to compile / run tests.
+            run_result = run_dslx_tests(generated_code, sample, f'{sample_filename}-attempt-{attempt}', tmpdir)
+
+            # From here on, normal path: run_result is defined.
+
+            # Persist run outputs for later inspection (both success and failure).
+            with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-result-retcode.txt'), 'w') as f:
+                print(run_result.retcode, file=f)
+            with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-result-stdout.txt'), 'w') as f:
+                f.write(run_result.stdout)
+            with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-result-stderr.txt'), 'w') as f:
+                f.write(run_result.stderr)
 
             termcolor.cprint('<<GENERATED', color='blue')
             print(generated_code)
