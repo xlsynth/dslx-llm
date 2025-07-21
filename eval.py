@@ -128,12 +128,29 @@ class CodeGenerator:
         return assistant_response
 
 def strip_fences(text: str) -> str:
+    """Return content inside the outermost triple-backtick fence.
+
+    Strict version: if an opening fence is present it *must* have a corresponding
+    closing fence at the same indentation level. Otherwise we raise a
+    ValueError so the calling logic can request a regeneration from the model.
+    """
     text = text.strip()
-    if text.startswith('```'):
-        lines = text.splitlines()
-        assert lines[-1] == '```'
-        text = '\n'.join(lines[1:-1])
-    return text
+
+    if not text.startswith('```'):
+        return text  # Unfenced – treat as literal DSLX.
+
+    lines = text.splitlines()
+
+    # Look for a matching closing fence from the end to capture the outermost.
+    try:
+        closing_index = len(lines) - 1 - lines[::-1].index('```')
+    except ValueError:
+        raise ValueError('Missing closing ``` fence in code block.')
+
+    if closing_index == 0:
+        raise ValueError('Code block consists solely of an opening ``` fence.')
+
+    return '\n'.join(lines[1:closing_index])
 
 @dataclasses.dataclass
 class RunResult:
@@ -208,6 +225,18 @@ def evaluate_sample(sample_path: Path, model: str, *, reasoning_effort: Optional
 
             all_generated.append(generated_code)
 
+            # Attempt to run tests; if we encounter malformed fences we will
+            # feed the error back to the model and retry (until max_retries).
+            try:
+                run_result = run_dslx_tests(generated_code, sample, f'{sample_filename}-attempt-{attempt}', tmpdir)
+            except ValueError as e:
+                print('🛑 Malformed fenced block, requesting regeneration…')
+                feedback_from_last_iteration = str(e)
+                continue
+
+            # Normal path: we got a run result; break evaluation loop logic
+            # below will handle success/failure.
+
             termcolor.cprint('<<GENERATED', color='blue')
             print(generated_code)
             termcolor.cprint('GENERATED', color='blue')
@@ -217,21 +246,9 @@ def evaluate_sample(sample_path: Path, model: str, *, reasoning_effort: Optional
                 print_color_diff(all_generated[-2], all_generated[-1])
                 termcolor.cprint('DIFF', color='blue')
 
-            run_result = run_dslx_tests(generated_code, sample, f'{sample_filename}-attempt-{attempt}', tmpdir)
-
-            # Write out results to the tmpdir as well.
-            with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-result-retcode.txt'), 'w') as f:
-                print(run_result.retcode, file=f)
-            with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-result-stdout.txt'), 'w') as f:
-                f.write(run_result.stdout)
-            with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-result-stderr.txt'), 'w') as f:
-                f.write(run_result.stderr)
-
             if run_result.success:
                 print(f"✅ Success on attempt {attempt}")
-                if attempt == 1:
-                    first_attempt_success = True
-                return EvaluateSampleResult(success=True, first_attempt_success=first_attempt_success)
+                return EvaluateSampleResult(True, attempt == 1)
 
             print(f"❌ Error on attempt {attempt}; command: {run_result.command}")
 
