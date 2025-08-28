@@ -224,7 +224,7 @@ Array slicing is provided as a built-in operation. Note that the "want" argument
 
 `fn array_slice<T: type, N: u32, M: u32, S: u32>(xs: T[N], start: uN[M], want: T[S]) -> T[S]`
 
-The standard way to provide the `want` argument is to pass zero!<T[S]>() where `T[S]` is the desired slice type.
+The standard way to provide the "want" argument is to pass `zero!<T[S]>()` where `T[S]` is the desired slice type.
 
 **Destructuring Tuple Type Syntax** Tuple type syntax for a destructuring assignment is the same as stable Rust, the tuple type annotation comes after the pattern binding:
 
