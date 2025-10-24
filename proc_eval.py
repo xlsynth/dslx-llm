@@ -80,6 +80,7 @@ def run_proc_tests(
 
 def evaluate_sample(
     sample_path: Path,
+    provider: str,
     model: str,
     *,
     reasoning_effort: Optional[str],
@@ -127,7 +128,7 @@ def evaluate_sample(
 def main() -> None:
     parser = optparse.OptionParser()
     parser.add_option('--list', action='store_true', default=False, help='list available proc samples and exit')
-    parser.add_option('--model', default=None, choices=MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(MODEL_CHOICES))
+    parser.add_option('--model', default=None, choices=provider.MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(provider.MODEL_CHOICES))
     parser.add_option('--sample', default=None, choices=get_sample_choices(SAMPLES_DIR), help='evaluate a single proc sample by name')
     parser.add_option('--only', default=None, help='comma-separated list of proc samples to evaluate (e.g. foo,bar,baz)')
     parser.add_option('--external-sample', default=None, type=str, help="Path to the external proc sample that will be evaluated")
@@ -135,7 +136,7 @@ def main() -> None:
     parser.add_option('--max-retries', default=3, type=int)
     parser.add_option('--reasoning-effort', default='high', choices=['low', 'medium', 'high'], help='choose a reasoning effort; choices: %s' % '|'.join(['low', 'medium', 'high']))
     parser.add_option('--no-critic', action='store_true', default=False, help='disable the requirements critic step')
-    parser.add_option('--critic-model', default=None, choices=MODEL_CHOICES, help='model to use for requirements critic step (defaults to --model)')
+    parser.add_option('--critic-model', default=None, choices=provider.MODEL_CHOICES, help='model to use for requirements critic step (defaults to --model)')
     parser.add_option('--critic-reasoning-effort', default=None, choices=['low', 'medium', 'high'], help='reasoning effort for critic model (defaults to --reasoning-effort)')
     parser.add_option('--test-file', type='string', default=None, help='File with additional proc tests')
     parser.add_option('--save-to', type='string', default=None, help="Path where generated proc should be saved")
@@ -184,6 +185,7 @@ def main() -> None:
         print(f"Evaluating {sample_file}...")
         result = evaluate_sample(
             sample_file,
+            provider,
             opts.model,
             reasoning_effort=opts.reasoning_effort,
             max_retries=opts.max_retries,
@@ -226,9 +228,9 @@ def main() -> None:
     print(f"Pass Rate (First Attempt): {first_attempt_success_count / total_samples:.2%}")
     print(f"Pass Rate (All Attempts): {total_success / total_samples:.2%}")
     print("\nUsed tokens:")
-    print(f"Input (without cached): {TOTAL_USAGE['input']}")
-    print(f"Cached tokens: {TOTAL_USAGE['cached']}")
-    print(f"Output: {TOTAL_USAGE['output']}")
+    print(f"Input (without cached): {provider.TOTAL_USAGE['input']}")
+    print(f"Cached tokens: {provider.TOTAL_USAGE['cached']}")
+    print(f"Output: {provider.TOTAL_USAGE['output']}")
 
 
 if __name__ == "__main__":

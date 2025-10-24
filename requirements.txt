@@ -4,3 +4,4 @@ pytest==8.3.4
 openai==1.59.8
 termcolor==2.5.0
 pre-commit==4.1
+google-genai==1.68.0
