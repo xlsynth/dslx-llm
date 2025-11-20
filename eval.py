@@ -79,7 +79,7 @@ class CodeGenerator:
         ]
 
     def _get_chat_kwargs(self):
-        if self.model == 'o3-mini' or self.model == 'o4-mini':
+        if self.model in ('o3-mini', 'o4-mini', 'gpt-5.1'):
             assert self.reasoning_effort is not None
             return {
                 'model': self.model,
@@ -294,6 +294,7 @@ def main() -> None:
         'o4-mini',
         'gpt-4.1',
         'gpt-4.1-mini',
+        'gpt-5.1',
     ]
 
     parser = optparse.OptionParser()
