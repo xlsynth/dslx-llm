@@ -38,18 +38,18 @@ jobs:
         id: fetch-xlsynth
         run: |
           API_URL="https://api.github.com/repos/xlsynth/xlsynth/releases/latest"
-          RESPONSE=$(curl -s $API_URL)
-          DSLX_INTERPRETER_BINARY_URL=$(echo $RESPONSE | jq -r '.assets[] | select(.name == "dslx_interpreter_main-ubuntu2204") | .browser_download_url')
-          DSLX_TYPECHECK_BINARY_URL=$(echo $RESPONSE | jq -r '.assets[] | select(.name == "typecheck_main-ubuntu2204") | .browser_download_url')
-          DSLX_STDLIB_URL=$(echo $RESPONSE | jq -r '.assets[] | select(.name == "dslx_stdlib.tar.gz") | .browser_download_url')
+          RESPONSE=$(curl -s "$API_URL")
+          DSLX_INTERPRETER_BINARY_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name == "dslx_interpreter_main-ubuntu2004") | .browser_download_url')
+          DSLX_TYPECHECK_BINARY_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name == "typecheck_main-ubuntu2004") | .browser_download_url')
+          DSLX_STDLIB_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name == "dslx_stdlib.tar.gz") | .browser_download_url')
           if [ -z "$DSLX_INTERPRETER_BINARY_URL" ] || [ -z "$DSLX_TYPECHECK_BINARY_URL" ] || [ -z "$DSLX_STDLIB_URL" ]; then
             echo "Error: Could not find required assets in the latest release." >&2
             exit 1
           fi
-          echo "DSLX_INTERPRETER_BINARY_URL=$DSLX_INTERPRETER_BINARY_URL" >> $GITHUB_ENV
-          echo "DSLX_TYPECHECK_BINARY_URL=$DSLX_TYPECHECK_BINARY_URL" >> $GITHUB_ENV
-          echo "DSLX_STDLIB_URL=$DSLX_STDLIB_URL" >> $GITHUB_ENV
-          echo "XLSYNTH_TOOLS=$pwd" >> $GITHUB_ENV
+          echo "DSLX_INTERPRETER_BINARY_URL=$DSLX_INTERPRETER_BINARY_URL" >> "$GITHUB_ENV"
+          echo "DSLX_TYPECHECK_BINARY_URL=$DSLX_TYPECHECK_BINARY_URL" >> "$GITHUB_ENV"
+          echo "DSLX_STDLIB_URL=$DSLX_STDLIB_URL" >> "$GITHUB_ENV"
+          echo "XLSYNTH_TOOLS=$(pwd)" >> "$GITHUB_ENV"
 
       - name: Download DSLX interpreter binary
         run: |
