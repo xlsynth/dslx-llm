@@ -32,7 +32,7 @@ fn prop_bitonic_sort(array: s3[4]) -> bool {
     let sorted = bitonic_sort(array);
 
     // 1) Check sorted
-    let is_sorted = for (i, acc) in range(u32:0, u32:4 - u32:1) {
+    let is_sorted = for (i, acc) in u32:0..u32:4 - u32:1 {
         acc && (sorted[i] <= sorted[i + 1])
     }(true);
 

@@ -20,7 +20,7 @@ fn test_prefix_sum_simple() {
 
 #[test]
 fn test_prefix_sum_signed() {
-    assert_eq(prefix_sum(s3[3]:[-1, -2, -3]), s3[3]:[-1, -3, -6]);
+    assert_eq(prefix_sum(s4[3]:[-1, -2, -3]), s4[3]:[-1, -3, -6]);
 }
 
 #[quickcheck]

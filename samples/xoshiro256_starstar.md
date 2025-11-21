@@ -10,7 +10,7 @@ The generator uses four 64-bit words of internal state. One *step* produces a 64
 1. Multiply the **second** word of state by 5.
 2. Rotate that product to the left by 7 bits.
 3. Multiply the rotated value by 9 – the result is the random output for this step.
-4. Create a temporary value `t` by shifting the **second** state word left by 17 bits (wrapping modulo 2⁶⁴).
+4. Create a temporary value `t` by shifting the **second** state word left by 17 bits.
 5. Mix the state with a chain of XOR operations:
    • word₂ ← word₂ XOR word₀
    • word₃ ← word₃ XOR word₁
