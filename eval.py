@@ -6,7 +6,6 @@ import json
 import optparse
 import os
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Optional, List, Dict
 
@@ -99,6 +98,29 @@ def parse_sample(file_path: Path) -> Sample:
         requirements="\n".join(sections["requirements"]).strip() if "requirements" in sections else None,
     )
 
+# Gathers statistics about token usage from current run
+TOTAL_USAGE = {
+    "input": 0,
+    "cached": 0,
+    "output": 0,
+}
+
+def print_usage(usage: openai.types.CompletionUsage | None):
+    """Display token usage of a response and gathers data for a statistics."""
+    if usage is None:
+        return
+
+    # Gather stats
+    TOTAL_USAGE["cached"] += usage.prompt_tokens_details.cached_tokens
+    TOTAL_USAGE["input"] += usage.prompt_tokens - usage.prompt_tokens_details.cached_tokens
+    TOTAL_USAGE["output"] += usage.completion_tokens
+    # Display used tokens
+    termcolor.cprint(
+        f"Used tokens - in {usage.prompt_tokens} (cached {usage.prompt_tokens_details.cached_tokens})"
+        f" - out {usage.completion_tokens} - total {usage.total_tokens}",
+        color="red",
+    )
+
 class CodeGenerator:
     def __init__(self, model: str, reasoning_effort: Optional[str], system_prompt: str):
         """Initialize the CodeGenerator with a persistent OpenAI connection."""
@@ -140,6 +162,7 @@ class CodeGenerator:
         response = self.client.chat.completions.create(
             **self._get_chat_kwargs()
         )
+        print_usage(response.usage)
 
         # Capture assistant response and add it to the message history
         assistant_response = response.choices[0].message.content.strip()
@@ -156,6 +179,7 @@ class CodeGenerator:
         response = self.client.chat.completions.create(
             **self._get_chat_kwargs()
         )
+        print_usage(response.usage)
 
         # Capture assistant response and add it to the message history
         assistant_response = response.choices[0].message.content.strip()
@@ -218,6 +242,7 @@ def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tm
 class EvaluateSampleResult:
     success: bool
     first_attempt_success: bool
+    generated: str | None
 
 def evaluate_sample(
     sample_path: Path,
@@ -330,7 +355,7 @@ def evaluate_sample(
                         continue
 
                 print(f"✅ Success on attempt {attempt}")
-                return EvaluateSampleResult(True, attempt == 1)
+                return EvaluateSampleResult(True, attempt == 1, all_generated[-1])
 
             print(f"❌ Error on attempt {attempt}; command: {run_result.command}")
 
@@ -341,7 +366,11 @@ def evaluate_sample(
             feedback_from_last_iteration = run_result.stderr
 
     print("❌ All attempts failed.")
-    return EvaluateSampleResult(success=False, first_attempt_success=first_attempt_success)
+    return EvaluateSampleResult(
+        success=False,
+        first_attempt_success=first_attempt_success,
+        generated=all_generated[-1] if all_generated else None
+    )
 
 def get_sample_choices() -> list[str]:
     """Returns available sample names (sorted, unique)."""
@@ -363,6 +392,7 @@ def main() -> None:
     parser.add_option('--no-critic', action='store_true', default=False, help='disable the requirements critic step')
     parser.add_option('--critic-model', default=None, choices=MODEL_CHOICES, help='model to use for requirements critic step (defaults to --model)')
     parser.add_option('--critic-reasoning-effort', default=None, choices=['low', 'medium', 'high'], help='reasoning effort for critic model (defaults to --reasoning-effort)')
+    parser.add_option('--save-to', type='string', default=None, help="Path where generated component should be saved")
     opts, args = parser.parse_args()
 
     if args:
@@ -435,11 +465,21 @@ def main() -> None:
             leader = "❌"
         first_attempt = "FIRST ATTEMPT" if result.first_attempt_success else "MULTIPLE ATTEMPTS"
         print(f"{leader} {sample}: {status} ({first_attempt})")
+        if opts.save_to and result.generated:
+            opts.save_to = Path(opts.save_to)
+            opts.save_to.parent.mkdir(exist_ok=True)
+            with opts.save_to.open("w") as fd:
+                fd.write(result.generated)
+            print(f"Generated XLS saved to {str(opts.save_to)}")
 
     print("\nSummary:")
     print(f"Total Samples: {total_samples}")
     print(f"Pass Rate (First Attempt): {first_attempt_success_count / total_samples:.2%}")
     print(f"Pass Rate (All Attempts): {total_success / total_samples:.2%}")
+    print("\nUsed tokens:")
+    print(f"Input (without cached): {TOTAL_USAGE['input']}")
+    print(f"Cached tokens: {TOTAL_USAGE['cached']}")
+    print(f"Output: {TOTAL_USAGE['output']}")
 
 if __name__ == "__main__":
     main()
