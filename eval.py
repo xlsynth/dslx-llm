@@ -195,7 +195,7 @@ class RunResult:
     stdout: str
     stderr: str
 
-def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tmpdir: str) -> RunResult:
+def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tmpdir: str, test_file: Path | None) -> RunResult:
     """Run DSLX tests using the interpreter."""
     prologue_lines = []
     if sample.prologue:
@@ -211,7 +211,15 @@ def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tm
     if not has_import_std:
         prologue_lines.append('import std;')
 
+    # Get additional tests from separate file
+    additional_tests = None
+    if test_file:
+        with test_file.open("r") as fd:
+            additional_tests = fd.read()
+
     full_code = '\n'.join(prologue_lines) + '\n\n' + strip_fences(generated_code) + "\n\n// -- tests\n\n" + strip_fences(sample.tests)
+    if additional_tests:
+        full_code += f"\n\n// -- {str(test_file)}\n\n" + additional_tests
     x_path = os.path.join(tmpdir, sample_filename + ".x")
     with open(x_path, "w") as f:
         f.write(full_code)
@@ -253,6 +261,7 @@ def evaluate_sample(
     run_critic_step: bool,
     critic_model: str,
     critic_reasoning_effort: Optional[str],
+    test_file: Optional[Path],
 ) -> EvaluateSampleResult:
     """Evaluate a single sample.
 
@@ -302,7 +311,7 @@ def evaluate_sample(
                 continue
 
             # Fences look good → proceed to compile / run tests.
-            run_result = run_dslx_tests(generated_code, sample, f'{sample_filename}-attempt-{attempt}', tmpdir)
+            run_result = run_dslx_tests(generated_code, sample, f'{sample_filename}-attempt-{attempt}', tmpdir, test_file)
 
             # From here on, normal path: run_result is defined.
 
@@ -392,6 +401,7 @@ def main() -> None:
     parser.add_option('--no-critic', action='store_true', default=False, help='disable the requirements critic step')
     parser.add_option('--critic-model', default=None, choices=MODEL_CHOICES, help='model to use for requirements critic step (defaults to --model)')
     parser.add_option('--critic-reasoning-effort', default=None, choices=['low', 'medium', 'high'], help='reasoning effort for critic model (defaults to --reasoning-effort)')
+    parser.add_option('--test-file', type='string', default=None, help='File with additional tests')
     parser.add_option('--save-to', type='string', default=None, help="Path where generated component should be saved")
     opts, args = parser.parse_args()
 
@@ -447,6 +457,7 @@ def main() -> None:
             run_critic_step=not opts.no_critic,
             critic_model=critic_model,
             critic_reasoning_effort=critic_reasoning_effort,
+            test_file=Path(opts.test_file) if opts.test_file else None,
         )
         results[sample_file] = result
 
