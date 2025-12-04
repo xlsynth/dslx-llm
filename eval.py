@@ -5,6 +5,7 @@ import difflib
 import json
 import optparse
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Optional, List, Dict
@@ -195,7 +196,17 @@ class RunResult:
     stdout: str
     stderr: str
 
-def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tmpdir: str, test_file: Path | None) -> RunResult:
+def get_first_n_failed_tests(stderr: str, n: int = 5):
+    """Extracts first n failed tests from STDERR."""
+    # Make sure the output contains tests' results
+    if "RUN UNITTEST" not in stderr or "FAILED" not in stderr:
+        return stderr
+
+    matches = re.findall(r"\[ RUN UNITTEST  \].*?\n[^\[](?:.|\n)*?\[        FAILED \].*?$", stderr, re.MULTILINE)
+    summary = stderr.rsplit("\n", maxsplit=2)[1]
+    return "\n".join(matches[:n] if n > 0 else matches) + f"\n{summary}\n"
+
+def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tmpdir: str, test_file: Path | None, additional_dslx_path: Path | None) -> RunResult:
     """Run DSLX tests using the interpreter."""
     prologue_lines = []
     if sample.prologue:
@@ -236,6 +247,8 @@ def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tm
         *extra_flags,
         '--compare=jit',
     ]
+    if additional_dslx_path:
+        cmd += ["--dslx_path", str(additional_dslx_path.resolve())]
     result = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
@@ -262,6 +275,8 @@ def evaluate_sample(
     critic_model: str,
     critic_reasoning_effort: Optional[str],
     test_file: Optional[Path],
+    reduce_test_errors: Optional[int] = None,
+    additional_dslx_path: Optional[Path] = None,
 ) -> EvaluateSampleResult:
     """Evaluate a single sample.
 
@@ -270,6 +285,9 @@ def evaluate_sample(
         model: The model to evaluate.
         reasoning_effort: The reasoning effort to use, i.e. in case of o3-mini.
         max_retries: The maximum number of retries to attempt before declaring failure.
+        test_file: The optional path where generated code will be saved.
+        reduce_test_errors: How many (at most) test failures should be provided as a feedback? If None, the whole STDERR is used.
+        additional_dslx_path: The path to the additional DSLX modules.
 
     Returns:
         A tuple containing a boolean indicating whether the sample was evaluated successfully and a boolean indicating whether the sample was evaluated successfully on the first attempt.
@@ -311,7 +329,7 @@ def evaluate_sample(
                 continue
 
             # Fences look good → proceed to compile / run tests.
-            run_result = run_dslx_tests(generated_code, sample, f'{sample_filename}-attempt-{attempt}', tmpdir, test_file)
+            run_result = run_dslx_tests(generated_code, sample, f'{sample_filename}-attempt-{attempt}', tmpdir, test_file, additional_dslx_path)
 
             # From here on, normal path: run_result is defined.
 
@@ -368,11 +386,15 @@ def evaluate_sample(
 
             print(f"❌ Error on attempt {attempt}; command: {run_result.command}")
 
-            termcolor.cprint('<<OUTPUT', color='blue')
-            print(run_result.stderr, end='')
+            if reduce_test_errors is not None:
+                first_failures = get_first_n_failed_tests(run_result.stderr, reduce_test_errors)
+            else:
+                first_failures = run_result.stderr
+            termcolor.cprint(f'<<OUTPUT {"[filtered]" if reduce_test_errors is not None else ""}', color='blue')
+            print(first_failures, end='')
             termcolor.cprint('OUTPUT', color='blue')
 
-            feedback_from_last_iteration = run_result.stderr
+            feedback_from_last_iteration = first_failures
 
     print("❌ All attempts failed.")
     return EvaluateSampleResult(
@@ -403,6 +425,8 @@ def main() -> None:
     parser.add_option('--critic-reasoning-effort', default=None, choices=['low', 'medium', 'high'], help='reasoning effort for critic model (defaults to --reasoning-effort)')
     parser.add_option('--test-file', type='string', default=None, help='File with additional tests')
     parser.add_option('--save-to', type='string', default=None, help="Path where generated component should be saved")
+    parser.add_option('--reduce-test-errors', type=int, default=None, help='How many (at most) test failures should be provided as a feedback? If None, the whole STDERR is used')
+    parser.add_option('--additional-dslx-path', type=str, default=None, help='Where to look for additional DSLX modules')
     opts, args = parser.parse_args()
 
     if args:
@@ -458,6 +482,8 @@ def main() -> None:
             critic_model=critic_model,
             critic_reasoning_effort=critic_reasoning_effort,
             test_file=Path(opts.test_file) if opts.test_file else None,
+            reduce_test_errors=opts.reduce_test_errors,
+            additional_dslx_path=Path(opts.additional_dslx_path) if opts.additional_dslx_path else None,
         )
         results[sample_file] = result
 
