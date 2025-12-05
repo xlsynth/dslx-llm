@@ -418,6 +418,8 @@ def main() -> None:
     parser.add_option('--model', default=None, choices=MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(MODEL_CHOICES))
     parser.add_option('--sample', default=None, choices=get_sample_choices(), help='evaluate a single sample by name')
     parser.add_option('--only', default=None, help='comma-separated list of samples to evaluate (e.g. foo,bar,baz)')
+    parser.add_option('--external-sample', default=None, type=str, help="Path to the external sample that will be evaluated")
+    parser.add_option('--external-prompt', default=None, type=str, help="Path to the prompt to use instead of prompt.md")
     parser.add_option('--max-retries', default=3, type=int)
     parser.add_option('--reasoning-effort', default='high', choices=['low', 'medium', 'high'], help='choose a reasoning effort; choices: %s' % '|'.join(['low', 'medium', 'high']))
     parser.add_option('--no-critic', action='store_true', default=False, help='disable the requirements critic step')
@@ -440,6 +442,13 @@ def main() -> None:
 
     if opts.model is None:
         parser.error('--model is required')
+
+    # Use external prompt
+    if opts.external_prompt:
+        global PROMPT_FILE
+        global SYSTEM_PROMPT
+        PROMPT_FILE = opts.external_prompt
+        SYSTEM_PROMPT = load_system_prompt()
 
     if opts.sample and opts.only:
         parser.error('cannot specify both --sample and --only')
@@ -465,6 +474,13 @@ def main() -> None:
             seen.add(name)
             deduped_only.append(name)
         sample_files = [Path(SAMPLES_DIR, name + '.md') for name in deduped_only]
+
+    if opts.external_sample:
+        # If neither sample nor only was specified, evaluate only external sample
+        if opts.sample is None and opts.only is None:
+            sample_files = [Path(opts.external_sample)]
+        else:
+            sample_files.append(Path(opts.external_sample))
 
     results: Dict[Path, EvaluateSampleResult] = {}
 
