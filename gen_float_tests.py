@@ -153,7 +153,7 @@ def generate_tests(args):
         raise
 
 
-def main():
+def create_parser():
     parser = optparse.OptionParser()
     parser.add_option("--testfloat-gen", type=str, default="testfloat_gen", help="Path to a testfloat_gen")
     parser.add_option("--only-numbers", action="store_true", help="Whether tests should include only numbers, Inf/NaN will not be present")
@@ -166,6 +166,11 @@ def main():
     parser.add_option("--rounding", choices=list(TESTFLOAT_GEN_ROUNDING.keys()), default=None, help="Used rounding mode")
     parser.add_option("--include-status", action="store_true", help="Use generated flags as IEEE status")
     parser.add_option("--output-file", type=str, default=None, help="Path where generated tests will be saved")
+    return parser
+
+
+def main():
+    parser = create_parser()
     opts, args = parser.parse_args()
 
     generate_tests(opts)
