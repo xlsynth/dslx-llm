@@ -123,14 +123,15 @@ def print_usage(usage: openai.types.CompletionUsage | None):
     )
 
 class CodeGenerator:
-    def __init__(self, model: str, reasoning_effort: Optional[str], system_prompt: str):
+    def __init__(self, model: str, reasoning_effort: Optional[str], system_prompt: str, timeout: int | float | None = None):
         """Initialize the CodeGenerator with a persistent OpenAI connection."""
         if openai is None:
             raise RuntimeError(
                 'The "openai" Python package is required to run evaluations. '
                 'Install it (e.g. `pip install -r requirements.txt`) and retry.'
             )
-        self.client = openai.Client()
+        client_kwargs = {"timeout": 60 * timeout} if timeout else {}
+        self.client = openai.Client(**client_kwargs)
         self.model = model
         self.reasoning_effort = reasoning_effort
         self.messages = [
@@ -277,6 +278,7 @@ def evaluate_sample(
     test_file: Optional[Path],
     reduce_test_errors: Optional[int] = None,
     additional_dslx_path: Optional[Path] = None,
+    timeout: Optional[int] = None,
 ) -> EvaluateSampleResult:
     """Evaluate a single sample.
 
@@ -287,7 +289,8 @@ def evaluate_sample(
         max_retries: The maximum number of retries to attempt before declaring failure.
         test_file: The optional path where generated code will be saved.
         reduce_test_errors: How many (at most) test failures should be provided as a feedback? If None, the whole STDERR is used.
-        additional_dslx_path: The path to the additional DSLX modules.
+        additional_dslx_path: The optional path with additional DSLX modules.
+        timeout: The timeout of one request.
 
     Returns:
         A tuple containing a boolean indicating whether the sample was evaluated successfully and a boolean indicating whether the sample was evaluated successfully on the first attempt.
@@ -296,7 +299,7 @@ def evaluate_sample(
     sample_filename, _ = os.path.splitext(sample_filename)
 
     sample: Sample = parse_sample(sample_path)
-    codegen = CodeGenerator(model, reasoning_effort, SYSTEM_PROMPT)
+    codegen = CodeGenerator(model, reasoning_effort, SYSTEM_PROMPT, timeout)
 
     with CompatTemporaryDirectory(suffix=f'-{model}-{sample_filename}', delete=False) as tmpdir:
         print('tmpdir:', tmpdir)
@@ -429,6 +432,7 @@ def main() -> None:
     parser.add_option('--save-to', type='string', default=None, help="Path where generated component should be saved")
     parser.add_option('--reduce-test-errors', type=int, default=None, help='How many (at most) test failures should be provided as a feedback? If None, the whole STDERR is used')
     parser.add_option('--additional-dslx-path', type=str, default=None, help='Where to look for additional DSLX modules')
+    parser.add_option('--timeout', default=None, type=int, help="Timeout of a one request in minutes")
     opts, args = parser.parse_args()
 
     if args:
@@ -500,6 +504,7 @@ def main() -> None:
             test_file=Path(opts.test_file) if opts.test_file else None,
             reduce_test_errors=opts.reduce_test_errors,
             additional_dslx_path=Path(opts.additional_dslx_path) if opts.additional_dslx_path else None,
+            timeout=opts.timeout,
         )
         results[sample_file] = result
 
