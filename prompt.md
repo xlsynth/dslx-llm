@@ -67,6 +67,7 @@ fn show_clz_ctz_builtins() {
 * the "subject" type to slice **must be unsigned**
 
 ```dslx
+// dslx_run_options: --warnings_as_errors=false
 #[test]
 fn show_width_slice() {
     let x = u16:0xabcd;

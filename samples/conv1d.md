@@ -47,7 +47,7 @@ fn prop_conv1d_impulse(data: u4[8]) -> bool {
     // For each valid index i, conv1d(data, [0,1,0])[i] == data[i+1] as u16.
     let impulse = u4[3]:[u4:0, u4:1, u4:0];
     let conv = conv1d(data, impulse);
-    let expected = for (i, res): (u32, u16[6]) in range(u32:0, u32:6) {
+    let expected = for (i, res): (u32, u16[6]) in u32:0..u32:6 {
          update(res, i, (data[i + u32:1] as u16))
     }(u16[6]:[0, ...]);
     conv == expected
