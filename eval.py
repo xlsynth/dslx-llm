@@ -18,6 +18,25 @@ import tools
 PROMPT_FILE = "prompt.md"
 SAMPLES_DIR = "samples/"
 
+# Models that require a reasoning effort config to be set.
+NEED_REASONING_EFFORT = set(['o3-mini', 'o4-mini', 'gpt-5.1', 'gpt-5.2'])
+MODEL_CHOICES = [
+    'gpt-3.5-turbo',
+    'gpt-4o-mini',
+    'gpt-4o',
+    'o1-preview',
+    'o1-mini',
+    'o1',
+    'o1-pro',
+    'o3-mini',
+    'o3',
+    'o4-mini',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'gpt-5.1',
+    'gpt-5.2',
+]
+
 def load_system_prompt() -> str:
     # Load the system prompt
     with open(PROMPT_FILE, "r") as f:
@@ -79,7 +98,7 @@ class CodeGenerator:
         ]
 
     def _get_chat_kwargs(self):
-        if self.model in ('o3-mini', 'o4-mini', 'gpt-5.1'):
+        if self.model in NEED_REASONING_EFFORT:
             assert self.reasoning_effort is not None
             return {
                 'model': self.model,
@@ -281,22 +300,6 @@ def get_sample_choices() -> list[str]:
 
 def main() -> None:
     """Main function to evaluate all samples."""
-    MODEL_CHOICES = [
-        'gpt-3.5-turbo',
-        'gpt-4o-mini',
-        'gpt-4o',
-        'o1-preview',
-        'o1-mini',
-        'o1',
-        'o1-pro',
-        'o3-mini',
-        'o3',
-        'o4-mini',
-        'gpt-4.1',
-        'gpt-4.1-mini',
-        'gpt-5.1',
-    ]
-
     parser = optparse.OptionParser()
     parser.add_option('--model', default=None, choices=MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(MODEL_CHOICES))
     parser.add_option('--sample', default=None, choices=get_sample_choices())
