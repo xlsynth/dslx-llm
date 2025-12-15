@@ -37,7 +37,7 @@ def try_extract_prologue(md_content: str) -> Optional[str]:
     if prologue_match:
         prologue_section_text = prologue_match.group(1)
         # Now we have to extract the code from the fence inside this section.
-        prologue_code_re = re.compile(r'^```dslx\s*\n(.*?)^```', re.DOTALL | re.MULTILINE)
+        prologue_code_re = re.compile(r'^```dslx(?:-snippet)?\s*\n(.*?)^```', re.DOTALL | re.MULTILINE)
         prologue_code_match = prologue_code_re.search(prologue_section_text)
         if prologue_code_match:
             return prologue_code_match.group(1)
@@ -72,10 +72,13 @@ def create_sample_with_stub(filename: str, md_content: str) -> CodeSample:
     prologue_re = re.compile(r'^## Prologue\s*\n(.*?)^##', re.DOTALL | re.MULTILINE)
     prologue_match = prologue_re.search(md_content)
     if prologue_match:
-        prologue = prologue_match.group(1)
-        prologue = prologue.replace('```dslx', '')
-        prologue = prologue.replace('```', '')
-        prologue = prologue.strip()
+        prologue_section = prologue_match.group(1)
+        # Extract the prologue code fence, supporting both 'dslx-snippet' and 'dslx'.
+        prologue_code_re = re.compile(r'^```dslx(?:-snippet)?\s*\n(.*?)^```', re.DOTALL | re.MULTILINE)
+        prologue_code_match = prologue_code_re.search(prologue_section)
+        if not prologue_code_match:
+            raise ValueError(f'No prologue code fence found in {filename}')
+        prologue = prologue_code_match.group(1).strip()
     else:
         prologue = ''
 
