@@ -101,5 +101,3 @@ fn quickcheck_compare_vs_std_with_cin_u3(x: u3, y: u3, carry_in: bool) -> bool {
     got_carry == want_carry && got_sum == want_sum
 }
 ```
-
-
