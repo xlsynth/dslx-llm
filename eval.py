@@ -5,8 +5,6 @@ import difflib
 import json
 import optparse
 import os
-import re
-import shlex
 import subprocess
 import tempfile
 from pathlib import Path
@@ -16,6 +14,9 @@ import termcolor
 from tempcompat import TemporaryDirectory as CompatTemporaryDirectory
 
 import tools
+import critic
+from dslx_run_flags import extract_dslx_run_flags
+from dslx_text import strip_fences
 
 try:
     import openai  # type: ignore
@@ -54,40 +55,7 @@ def load_system_prompt() -> str:
 
 SYSTEM_PROMPT = load_system_prompt()
 
-def load_dslx_critic_reference() -> str:
-    """Loads a small DSLX language reference excerpt to help the critic model."""
-    with open(PROMPT_FILE, "r") as f:
-        content = f.read()
-
-    # We want to include the key semantics that affect "graph of operations":
-    # - immutable arrays and `update`
-    # - `for` loops as accumulator-evolving expressions
-    # Provide a stable excerpt to keep token usage bounded.
-    intro = content.splitlines()[:80]
-    intro_text = "\n".join(intro).strip()
-
-    def slice_between(start_marker: str, end_marker: str) -> str:
-        try:
-            start = content.index(start_marker)
-            end = content.index(end_marker, start)
-        except ValueError:
-            return ""
-        return content[start:end].strip()
-
-    immutable_updates = slice_between("**Immutable Array Updates**", "**No Mutation, Even In Control Flow Blocks**")
-    for_loops = slice_between("**For Loops**", "**No While Loops**")
-
-    parts = [
-        "DSLX language reference (excerpt):",
-        intro_text,
-    ]
-    if immutable_updates:
-        parts.append(immutable_updates)
-    if for_loops:
-        parts.append(for_loops)
-    return "\n\n".join(parts).strip()
-
-DSLX_CRITIC_REFERENCE = load_dslx_critic_reference()
+DSLX_CRITIC_REFERENCE = critic.load_dslx_critic_reference(PROMPT_FILE)
 
 def print_color_diff(text1: str, text2: str) -> None:
     d = difflib.Differ()
@@ -195,152 +163,6 @@ class CodeGenerator:
 
         return assistant_response
 
-def strip_fences(text: str) -> str:
-    """Return content inside the outermost triple-backtick fence.
-
-    Strict version: if an opening fence is present it *must* have a corresponding
-    closing fence at the same indentation level. Otherwise we raise a
-    ValueError so the calling logic can request a regeneration from the model.
-    """
-    text = text.strip()
-
-    if not text.startswith('```'):
-        return text  # Unfenced – treat as literal DSLX.
-
-    lines = text.splitlines()
-
-    # Look for a matching closing fence from the end to capture the outermost.
-    try:
-        closing_index = len(lines) - 1 - lines[::-1].index('```')
-    except ValueError:
-        raise ValueError('Missing closing ``` fence in code block.')
-
-    if closing_index == 0:
-        raise ValueError('Code block consists solely of an opening ``` fence.')
-
-    return '\n'.join(lines[1:closing_index])
-
-@dataclasses.dataclass
-class CriticResult:
-    ok: bool
-    confidence: float
-    message: str
-    raw_json: str
-
-CRITIC_SYSTEM_PROMPT = """You are a strict requirements checker for DSLX code solutions.
-
-You will be given:
-- A problem prompt (English)
-- A function signature (DSLX)
-- A list of requirements (English)
-- A short DSLX language reference excerpt
-- A candidate DSLX implementation
-
-Your job is to decide whether the implementation meets the requirements. You must:
-- Treat comments as claims, not proof.
-- Decide based on the actual code structure.
-- If you cannot find concrete evidence that a requirement is satisfied, mark it as NOT satisfied.
-
-Important: The graph of operations matters, not merely whether a `for` loop iterates over all indices.
-For example, visiting every `i` is not evidence of a dense prefix network if most iterations simply copy
-state or if the data dependencies do not match the required structure. When the requirements are about
-algorithm structure (e.g. a Kogge-Stone prefix network), focus on:
-- What values are combined (data dependencies), not just which indices are iterated over.
-- Whether each stage recomputes prefix signals from the prior stage (stage-to-stage dependency), vs. a
-  sequential in-stage dependence that is effectively ripple-like.
-- Whether conditionals skip the combine operator for most indices, which can make the structure sparse.
-
-Return ONLY valid JSON with this schema:
-{
-  "pass": true|false,
-  "confidence": 0.0..1.0,
-  "message": "If pass=false: short, actionable reason(s). If pass=true: short confirmation.",
-  "per_requirement": [
-    {"id": "string", "pass": true|false, "evidence": ["string", ...], "message": "string"}
-  ]
-}
-"""
-
-def _chat_kwargs(model: str, reasoning_effort: Optional[str], messages):
-    if model in NEED_REASONING_EFFORT:
-        assert reasoning_effort is not None
-        return {'model': model, 'reasoning_effort': reasoning_effort, 'messages': messages}
-    return {'model': model, 'messages': messages}
-
-def _parse_critic_json(text: str) -> dict:
-    # Allow the critic to wrap the JSON in a triple-backtick block.
-    raw = strip_fences(text).strip()
-    return json.loads(raw)
-
-def run_critic(
-    *,
-    critic_model: str,
-    critic_reasoning_effort: Optional[str],
-    sample: Sample,
-    generated_code: str,
-) -> CriticResult:
-    assert sample.requirements is not None
-    if openai is None:
-        raise RuntimeError(
-            'The "openai" Python package is required to run evaluations. '
-            'Install it (e.g. `pip install -r requirements.txt`) and retry.'
-        )
-
-    candidate = strip_fences(generated_code).strip()
-    user_message = (
-        "Problem prompt:\n"
-        f"{sample.prompt}\n\n"
-        "Signature:\n"
-        f"{sample.signature}\n\n"
-        "Requirements:\n"
-        f"{sample.requirements}\n\n"
-        f"{DSLX_CRITIC_REFERENCE}\n\n"
-        "Candidate DSLX implementation:\n"
-        "```dslx\n"
-        f"{candidate}\n"
-        "```"
-    )
-
-    client = openai.Client()
-    messages = [
-        {"role": "system", "content": CRITIC_SYSTEM_PROMPT},
-        {"role": "user", "content": user_message},
-    ]
-
-    last_text = ""
-    for attempt in range(1, 3):
-        response = client.chat.completions.create(
-            **_chat_kwargs(critic_model, critic_reasoning_effort, messages)
-        )
-        last_text = response.choices[0].message.content.strip()
-        try:
-            parsed = _parse_critic_json(last_text)
-        except Exception as e:
-            # Ask for a regeneration with strictly valid JSON.
-            messages.append({"role": "assistant", "content": last_text})
-            messages.append({
-                "role": "user",
-                "content": (
-                    "Your previous response was not valid JSON and could not be parsed. "
-                    f"Parsing error: {e}. "
-                    "Please respond again with ONLY valid JSON matching the schema exactly."
-                ),
-            })
-            continue
-
-        ok = bool(parsed.get("pass"))
-        confidence = float(parsed.get("confidence", 0.0))
-        message = str(parsed.get("message", "")).strip()
-        raw_json = strip_fences(last_text).strip()
-        return CriticResult(ok=ok, confidence=confidence, message=message, raw_json=raw_json)
-
-    return CriticResult(
-        ok=False,
-        confidence=0.0,
-        message="Critic did not return valid JSON after retries.",
-        raw_json=strip_fences(last_text).strip(),
-    )
-
 @dataclasses.dataclass
 class RunResult:
     command: str
@@ -348,40 +170,6 @@ class RunResult:
     retcode: int
     stdout: str
     stderr: str
-
-_DSLX_RUN_FLAGS_RE = re.compile(r"^\s*//\s*dslx_run_(?:flags|options):\s*(.*)\s*$")
-
-def extract_dslx_run_flags(*texts: Optional[str]) -> list[str]:
-    """Extracts interpreter flags from directive comment lines.
-
-    Supported directives:
-      // dslx_run_flags: --warnings_as_errors=false
-      // dslx_run_options: --warnings_as_errors=false
-    """
-    flags: list[str] = []
-    for text in texts:
-        if not text:
-            continue
-        for line in text.splitlines():
-            m = _DSLX_RUN_FLAGS_RE.match(line)
-            if not m:
-                continue
-            extra = m.group(1).strip()
-            if not extra:
-                continue
-            for tok in shlex.split(extra):
-                assert tok.startswith('--'), f'dslx_run_* directive token must start with "--": {tok!r}'
-                flags.append(tok)
-
-    # Deduplicate while preserving order.
-    seen = set()
-    deduped: list[str] = []
-    for f in flags:
-        if f in seen:
-            continue
-        seen.add(f)
-        deduped.append(f)
-    return deduped
 
 def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tmpdir: str) -> RunResult:
     """Run DSLX tests using the interpreter."""
@@ -404,7 +192,10 @@ def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tm
     with open(x_path, "w") as f:
         f.write(full_code)
 
-    extra_flags = extract_dslx_run_flags(sample.prologue, generated_code)
+    extra_flags = []
+    if sample.prologue:
+        extra_flags.extend(extract_dslx_run_flags(sample.prologue))
+    extra_flags.extend(extract_dslx_run_flags(generated_code))
     cmd = [
         tools.DSLX_INTERPRETER_MAIN,
         x_path,
@@ -515,11 +306,15 @@ def evaluate_sample(
                     termcolor.cprint('CRITIQUEE', color='blue')
 
                     termcolor.cprint('<<CRITIC', color='blue')
-                    critic_result = run_critic(
+                    critic_result = critic.run_critic(
                         critic_model=critic_model,
                         critic_reasoning_effort=critic_reasoning_effort,
-                        sample=sample,
                         generated_code=generated_code,
+                        need_reasoning_effort=NEED_REASONING_EFFORT,
+                        dslx_critic_reference=DSLX_CRITIC_REFERENCE,
+                        prompt=sample.prompt,
+                        signature=sample.signature,
+                        requirements=sample.requirements,
                     )
                     print(critic_result.raw_json)
                     termcolor.cprint('CRITIC', color='blue')
