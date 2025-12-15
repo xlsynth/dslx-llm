@@ -4,7 +4,6 @@ from typing import Optional
 import dataclasses
 import os
 import re
-import shlex
 import tempfile
 import subprocess
 import sys
@@ -13,6 +12,7 @@ import pytest
 import tiktoken
 
 import tools
+from dslx_run_flags import split_dslx_run_flags_from_code
 
 PROMPT_MD_FILE = 'prompt.md'
 
@@ -37,7 +37,7 @@ def try_extract_prologue(md_content: str) -> Optional[str]:
     if prologue_match:
         prologue_section_text = prologue_match.group(1)
         # Now we have to extract the code from the fence inside this section.
-        prologue_code_re = re.compile(r'^```dslx\s*\n(.*?)^```', re.DOTALL | re.MULTILINE)
+        prologue_code_re = re.compile(r'^```dslx(?:-snippet)?\s*\n(.*?)^```', re.DOTALL | re.MULTILINE)
         prologue_code_match = prologue_code_re.search(prologue_section_text)
         if prologue_code_match:
             return prologue_code_match.group(1)
@@ -72,10 +72,13 @@ def create_sample_with_stub(filename: str, md_content: str) -> CodeSample:
     prologue_re = re.compile(r'^## Prologue\s*\n(.*?)^##', re.DOTALL | re.MULTILINE)
     prologue_match = prologue_re.search(md_content)
     if prologue_match:
-        prologue = prologue_match.group(1)
-        prologue = prologue.replace('```dslx', '')
-        prologue = prologue.replace('```', '')
-        prologue = prologue.strip()
+        prologue_section = prologue_match.group(1)
+        # Extract the prologue code fence, supporting both 'dslx-snippet' and 'dslx'.
+        prologue_code_re = re.compile(r'^```dslx(?:-snippet)?\s*\n(.*?)^```', re.DOTALL | re.MULTILINE)
+        prologue_code_match = prologue_code_re.search(prologue_section)
+        if not prologue_code_match:
+            raise ValueError(f'No prologue code fence found in {filename}')
+        prologue = prologue_code_match.group(1).strip()
     else:
         prologue = ''
 
@@ -148,32 +151,10 @@ def run_on_single_file(binary: str, code_sample: str, more_flags: tuple[str, ...
     finally:
         os.remove(tmp_filename)
 
-def split_run_flags_from_code_sample(code_sample: str) -> tuple[str, tuple[str, ...]]:
-    """Splits optional tool flags from the code sample.
-
-    A code sample may begin with one or more directive lines of the form:
-
-      // dslx_run_flags: --warnings_as_errors=false
-      // dslx_run_options: --warnings_as_errors=false
-
-    Those lines are stripped from the code passed to the tool, and the flags
-    are returned as an argv tuple.
-    """
-    flags: list[str] = []
-    lines = code_sample.splitlines()
-    kept_lines: list[str] = []
-    for line in lines:
-        m = re.match(r'^\s*//\s*dslx_run_(?:flags|options):\s*(.*)$', line)
-        if m:
-            flags.extend(shlex.split(m.group(1)))
-            continue
-        kept_lines.append(line)
-    return '\n'.join(kept_lines) + ('\n' if code_sample.endswith('\n') else ''), tuple(flags)
-
 @pytest.mark.parametrize('code_sample', PROMPT_CODE_SAMPLES)
 def test_prompt_code_sample(code_sample: str):
     """Tests DSLX code samples in prompt by running through the interpreter."""
-    cleaned, extra_flags = split_run_flags_from_code_sample(code_sample)
+    cleaned, extra_flags = split_dslx_run_flags_from_code(code_sample)
     run_on_single_file(tools.DSLX_INTERPRETER_MAIN, cleaned, more_flags=('--compare=jit',) + extra_flags)
 
 
@@ -247,6 +228,6 @@ def test_naive_reference_replacement(sample_filename: str) -> None:
     # `naive_reference` -- this let us check everything compiles and runs when we compare the
     # reference code to itself.
     modified_dslx_code = dslx_code.replace(signature_name, "naive_reference")
-    modified_dslx_code, extra_flags = split_run_flags_from_code_sample(modified_dslx_code)
+    modified_dslx_code, extra_flags = split_dslx_run_flags_from_code(modified_dslx_code)
     # Run the modified DSLX code through the interpreter.
     run_on_single_file(tools.DSLX_INTERPRETER_MAIN, modified_dslx_code, more_flags=("--compare=jit",) + extra_flags)

@@ -2,6 +2,7 @@
 
 import dataclasses
 import difflib
+import json
 import optparse
 import os
 import subprocess
@@ -13,6 +14,9 @@ import termcolor
 from tempcompat import TemporaryDirectory as CompatTemporaryDirectory
 
 import tools
+import critic
+from dslx_run_flags import extract_dslx_run_flags
+from dslx_text import strip_fences
 
 try:
     import openai  # type: ignore
@@ -51,6 +55,8 @@ def load_system_prompt() -> str:
 
 SYSTEM_PROMPT = load_system_prompt()
 
+DSLX_CRITIC_REFERENCE = critic.load_dslx_critic_reference(PROMPT_FILE)
+
 def print_color_diff(text1: str, text2: str) -> None:
     d = difflib.Differ()
     diff = list(d.compare(text1.splitlines(), text2.splitlines()))
@@ -71,6 +77,7 @@ class Sample:
     signature: str
     tests: str
     prologue: Optional[str] = None
+    requirements: Optional[str] = None
 
 def parse_sample(file_path: Path) -> Sample:
     """Parse the sample file to extract the prompt, signature, and tests."""
@@ -89,6 +96,7 @@ def parse_sample(file_path: Path) -> Sample:
         signature="\n".join(sections["signature"]).strip(),
         tests="\n".join(sections["tests"]).strip(),
         prologue="\n".join(sections["prologue"]).strip() if "prologue" in sections else None,
+        requirements="\n".join(sections["requirements"]).strip() if "requirements" in sections else None,
     )
 
 class CodeGenerator:
@@ -155,31 +163,6 @@ class CodeGenerator:
 
         return assistant_response
 
-def strip_fences(text: str) -> str:
-    """Return content inside the outermost triple-backtick fence.
-
-    Strict version: if an opening fence is present it *must* have a corresponding
-    closing fence at the same indentation level. Otherwise we raise a
-    ValueError so the calling logic can request a regeneration from the model.
-    """
-    text = text.strip()
-
-    if not text.startswith('```'):
-        return text  # Unfenced – treat as literal DSLX.
-
-    lines = text.splitlines()
-
-    # Look for a matching closing fence from the end to capture the outermost.
-    try:
-        closing_index = len(lines) - 1 - lines[::-1].index('```')
-    except ValueError:
-        raise ValueError('Missing closing ``` fence in code block.')
-
-    if closing_index == 0:
-        raise ValueError('Code block consists solely of an opening ``` fence.')
-
-    return '\n'.join(lines[1:closing_index])
-
 @dataclasses.dataclass
 class RunResult:
     command: str
@@ -191,19 +174,36 @@ class RunResult:
 def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tmpdir: str) -> RunResult:
     """Run DSLX tests using the interpreter."""
     prologue_lines = []
-    if 'import std;' not in generated_code:
-        prologue_lines.append('import std;')
     if sample.prologue:
         prologue = strip_fences(sample.prologue)
         for line in prologue.splitlines():
             prologue_lines.append(line.strip())
+    # Keep run options directives at the top of the file by appending any implicit
+    # imports after the sample prologue.
+    has_import_std = (
+        'import std;' in generated_code
+        or any(line.strip() == 'import std;' for line in prologue_lines)
+    )
+    if not has_import_std:
+        prologue_lines.append('import std;')
 
     full_code = '\n'.join(prologue_lines) + '\n\n' + strip_fences(generated_code) + "\n\n// -- tests\n\n" + strip_fences(sample.tests)
     x_path = os.path.join(tmpdir, sample_filename + ".x")
     with open(x_path, "w") as f:
         f.write(full_code)
 
-    cmd = [tools.DSLX_INTERPRETER_MAIN, x_path, '--dslx_stdlib_path', tools.DSLX_STDLIB_PATH, '--compare=jit']
+    extra_flags = []
+    if sample.prologue:
+        extra_flags.extend(extract_dslx_run_flags(sample.prologue))
+    extra_flags.extend(extract_dslx_run_flags(generated_code))
+    cmd = [
+        tools.DSLX_INTERPRETER_MAIN,
+        x_path,
+        '--dslx_stdlib_path',
+        tools.DSLX_STDLIB_PATH,
+        *extra_flags,
+        '--compare=jit',
+    ]
     result = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
@@ -219,7 +219,16 @@ class EvaluateSampleResult:
     success: bool
     first_attempt_success: bool
 
-def evaluate_sample(sample_path: Path, model: str, *, reasoning_effort: Optional[str], max_retries: int) -> EvaluateSampleResult:
+def evaluate_sample(
+    sample_path: Path,
+    model: str,
+    *,
+    reasoning_effort: Optional[str],
+    max_retries: int,
+    run_critic_step: bool,
+    critic_model: str,
+    critic_reasoning_effort: Optional[str],
+) -> EvaluateSampleResult:
     """Evaluate a single sample.
 
     Args:
@@ -290,6 +299,36 @@ def evaluate_sample(sample_path: Path, model: str, *, reasoning_effort: Optional
                 termcolor.cprint('DIFF', color='blue')
 
             if run_result.success:
+                # Tests are cheap; only if they pass do we run the (more expensive) critic.
+                if run_critic_step and sample.requirements:
+                    termcolor.cprint('<<CRITIQUEE', color='blue')
+                    print(strip_fences(generated_code).strip())
+                    termcolor.cprint('CRITIQUEE', color='blue')
+
+                    termcolor.cprint('<<CRITIC', color='blue')
+                    critic_result = critic.run_critic(
+                        critic_model=critic_model,
+                        critic_reasoning_effort=critic_reasoning_effort,
+                        generated_code=generated_code,
+                        need_reasoning_effort=NEED_REASONING_EFFORT,
+                        dslx_critic_reference=DSLX_CRITIC_REFERENCE,
+                        prompt=sample.prompt,
+                        signature=sample.signature,
+                        requirements=sample.requirements,
+                    )
+                    print(critic_result.raw_json)
+                    termcolor.cprint('CRITIC', color='blue')
+
+                    with open(os.path.join(tmpdir, f'{sample_filename}-attempt-{attempt}-critic.json'), 'w') as f:
+                        f.write(critic_result.raw_json)
+
+                    if not critic_result.ok:
+                        feedback_from_last_iteration = (
+                            "Requirements check failed (tests passed). Please revise the implementation to satisfy the requirements.\n\n"
+                            f"Critic message: {critic_result.message}\n"
+                        )
+                        continue
+
                 print(f"✅ Success on attempt {attempt}")
                 return EvaluateSampleResult(True, attempt == 1)
 
@@ -321,6 +360,9 @@ def main() -> None:
     parser.add_option('--only', default=None, help='comma-separated list of samples to evaluate (e.g. foo,bar,baz)')
     parser.add_option('--max-retries', default=3, type=int)
     parser.add_option('--reasoning-effort', default='high', choices=['low', 'medium', 'high'], help='choose a reasoning effort; choices: %s' % '|'.join(['low', 'medium', 'high']))
+    parser.add_option('--no-critic', action='store_true', default=False, help='disable the requirements critic step')
+    parser.add_option('--critic-model', default=None, choices=MODEL_CHOICES, help='model to use for requirements critic step (defaults to --model)')
+    parser.add_option('--critic-reasoning-effort', default=None, choices=['low', 'medium', 'high'], help='reasoning effort for critic model (defaults to --reasoning-effort)')
     opts, args = parser.parse_args()
 
     if args:
@@ -362,9 +404,20 @@ def main() -> None:
 
     results: Dict[Path, EvaluateSampleResult] = {}
 
+    critic_model = opts.critic_model or opts.model
+    critic_reasoning_effort = opts.critic_reasoning_effort or opts.reasoning_effort
+
     for sample_file in sample_files:
         print(f"Evaluating {sample_file}...")
-        result: EvaluateSampleResult = evaluate_sample(sample_file, opts.model, reasoning_effort=opts.reasoning_effort, max_retries=opts.max_retries)
+        result: EvaluateSampleResult = evaluate_sample(
+            sample_file,
+            opts.model,
+            reasoning_effort=opts.reasoning_effort,
+            max_retries=opts.max_retries,
+            run_critic_step=not opts.no_critic,
+            critic_model=critic_model,
+            critic_reasoning_effort=critic_reasoning_effort,
+        )
         results[sample_file] = result
 
     # Generate a scorecard

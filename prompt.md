@@ -444,7 +444,9 @@ fn show_unsigned_source_extension_is_zero_extension() {
 
 To reiterate: there is never any reason to define a helper function like `zero_extend` or `sign_extend` in DSLX, just use the `as` cast operator -- if the source type is unsigned it will zero extend, and if the source type is signed it will sign extend.
 
-**Keywords** Note that keywords in the language include `bits`, `in`, `out`, `token`, and `chan`, and the `u1` to `u128` and `s1` to `s128`, beyond those you would expect from Rust -- keywords are context-insensitive and so cannot be used as identifiers.
+**Keywords** Note that keywords in the language include `bits`, `in`, `out`, `token`, and `chan`, and the `u1` to `u128` and `s1` to `s128`, beyond those you would expect from Rust. Keywords are context-insensitive and so cannot be used as identifiers.
+
+In particular, you must not name variables `s1`, `s2`, `u8`, etc. Those look like "sum1/sum2" or "u8" to a human, but `s1`..`s128` and `u1`..`u128` are reserved type keywords in DSLX. Using them as identifiers will make the program fail to parse. Prefer names like `sum1`, `sum2`, `carry1`, `tmp`, etc.
 
 **Parameterized Functions** Parameterized functions in DSLX are similar to, but more powerful than, const generics in Rust. Parameterization in DSLX can do fairly arbitrary computation, and the syntax is shaped like so — note that any “derived parametric” values where we compute them based on other parametrics syntactically have their expressions in curls:
 
