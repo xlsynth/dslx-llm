@@ -9,11 +9,15 @@ import tempfile
 from pathlib import Path
 from typing import Optional, List, Dict
 
-import openai
 import termcolor
 from tempcompat import TemporaryDirectory as CompatTemporaryDirectory
 
 import tools
+
+try:
+    import openai  # type: ignore
+except ModuleNotFoundError:
+    openai = None
 
 PROMPT_FILE = "prompt.md"
 SAMPLES_DIR = "samples/"
@@ -90,6 +94,11 @@ def parse_sample(file_path: Path) -> Sample:
 class CodeGenerator:
     def __init__(self, model: str, reasoning_effort: Optional[str], system_prompt: str):
         """Initialize the CodeGenerator with a persistent OpenAI connection."""
+        if openai is None:
+            raise RuntimeError(
+                'The "openai" Python package is required to run evaluations. '
+                'Install it (e.g. `pip install -r requirements.txt`) and retry.'
+            )
         self.client = openai.Client()
         self.model = model
         self.reasoning_effort = reasoning_effort
@@ -296,26 +305,60 @@ def evaluate_sample(sample_path: Path, model: str, *, reasoning_effort: Optional
     return EvaluateSampleResult(success=False, first_attempt_success=first_attempt_success)
 
 def get_sample_choices() -> list[str]:
-    return [os.path.splitext(filename)[0] for filename in os.listdir(SAMPLES_DIR)]
+    """Returns available sample names (sorted, unique)."""
+    return sorted({p.stem for p in Path(SAMPLES_DIR).glob("*.md")})
+
+def parse_only_csv(value: str) -> list[str]:
+    parts = [p.strip() for p in value.split(",")]
+    return [p for p in parts if p]
 
 def main() -> None:
     """Main function to evaluate all samples."""
     parser = optparse.OptionParser()
+    parser.add_option('--list', action='store_true', default=False, help='list available samples and exit')
     parser.add_option('--model', default=None, choices=MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(MODEL_CHOICES))
-    parser.add_option('--sample', default=None, choices=get_sample_choices())
+    parser.add_option('--sample', default=None, choices=get_sample_choices(), help='evaluate a single sample by name')
+    parser.add_option('--only', default=None, help='comma-separated list of samples to evaluate (e.g. foo,bar,baz)')
     parser.add_option('--max-retries', default=3, type=int)
     parser.add_option('--reasoning-effort', default='high', choices=['low', 'medium', 'high'], help='choose a reasoning effort; choices: %s' % '|'.join(['low', 'medium', 'high']))
     opts, args = parser.parse_args()
 
     if args:
         parser.error('No args are expected')
+
+    sample_choices = get_sample_choices()
+    if opts.list:
+        for name in sample_choices:
+            print(name)
+        return
+
     if opts.model is None:
         parser.error('--model is required')
 
+    if opts.sample and opts.only:
+        parser.error('cannot specify both --sample and --only')
+
     sample_files: List[Path] = list(Path(SAMPLES_DIR).glob("*.md"))
+    sample_files = sorted(sample_files)
 
     if opts.sample:
         sample_files = [Path(SAMPLES_DIR, opts.sample + '.md')]
+    elif opts.only:
+        only_list = parse_only_csv(opts.only)
+        if not only_list:
+            parser.error('--only was provided but no sample names were found')
+        unknown = sorted(set(only_list) - set(sample_choices))
+        if unknown:
+            parser.error('unknown sample(s) in --only: %s' % ','.join(unknown))
+        # Preserve user-provided order while avoiding duplicates.
+        seen = set()
+        deduped_only = []
+        for name in only_list:
+            if name in seen:
+                continue
+            seen.add(name)
+            deduped_only.append(name)
+        sample_files = [Path(SAMPLES_DIR, name + '.md') for name in deduped_only]
 
     results: Dict[Path, EvaluateSampleResult] = {}
 
