@@ -176,5 +176,3 @@ def run_critic(
         message="Critic did not return valid JSON after retries.",
         raw_json=strip_fences(last_text).strip(),
     )
-
-

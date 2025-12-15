@@ -23,5 +23,3 @@ def strip_fences(text: str) -> str:
         raise ValueError("Code block consists solely of an opening ``` fence.")
 
     return "\n".join(lines[1:closing_index])
-
-

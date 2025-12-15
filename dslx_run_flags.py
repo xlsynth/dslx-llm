@@ -51,5 +51,3 @@ def split_dslx_run_flags_from_code(code: str) -> tuple[str, tuple[str, ...]]:
         kept_lines.append(line)
     cleaned = "\n".join(kept_lines) + ("\n" if code.endswith("\n") else "")
     return cleaned, tuple(flags)
-
-
