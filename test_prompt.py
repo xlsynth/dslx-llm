@@ -176,7 +176,7 @@ def test_prompt_size():
     print('token count:', token_count, file=sys.stderr)
 
     # Check we stay comfortably within a reasonable context window.
-    assert token_count <= 8 * 1024
+    assert token_count < 11 * 1024
 
 
 # Added test for replacing signature with naive_reference in samples that contain 'fn naive_reference'

@@ -115,3 +115,21 @@ DSLX_STDLIB_PATH=$HOME/opt/xlsynth/latest/xls/dslx/stdlib/ pytest test_prompt.py
 * Parity: this is simply a call to the `std::popcount` function <https://google.github.io/xls/dslx_std/#stdpopcount>
 * Bit Reversal: this is simply a call to the `rev` built-in function <https://google.github.io/xls/dslx_std/#rev>
 * One-Hot Encoder: this is simply a call to the `encode` built-in function <https://google.github.io/xls/dslx_std/#encode>
+
+## `fp_sqrt` sample
+
+The floating-point square root requires additional tests that can be generated with `gen_float_tests.py` script based on [testfloat_gen](https://www.jhauser.us/arithmetic/TestFloat-3/doc/TestFloat-general.html) output.
+
+```bash
+python gen_float_tests.py --output-file ./tests/fp_sqrt.x --only-numbers --tested-func test_fp16_sqrt --function sqrt
+```
+
+It generates minimal number of test cases for a square root of 16-bit floating-point number that call `test_fp16_sqrt` defined in [fp_sqrt.md](./samples/fp_sqrt.md).
+The `--only-numbers` skips all tests that includes NaN.
+With the tests, the sample can be run as follows:
+
+```bash
+python eval.py --model $MODEL --sample fp_sqrt --max-retries 5 --save-to generated.x --test-file ./tests/fp_sqrt.x --reduce-test-errors 6
+```
+
+The produced code may not cover all edge-cases, but provides base logic of the operation.

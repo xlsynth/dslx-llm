@@ -21,6 +21,23 @@ jobs:
           sudo ./llvm.sh 18
           sudo apt-get install -y libc++-18-dev libc++abi-18-dev
 
+      - name: Install testfloat_gen
+        run: |
+          pushd /tmp
+          wget https://www.jhauser.us/arithmetic/TestFloat-3e.zip
+          wget https://www.jhauser.us/arithmetic/SoftFloat-3e.zip
+          unzip ./SoftFloat-3e.zip
+          unzip ./TestFloat-3e.zip
+          pushd SoftFloat-3e/build/Linux-x86_64-GCC
+          make
+          popd
+          pushd TestFloat-3e/build/Linux-x86_64-GCC
+          make
+          sudo cp $PWD/testfloat_gen /usr/bin/
+          sudo chmod a+x /usr/bin/testfloat_gen
+          popd && popd
+          testfloat_gen -h
+
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -80,4 +97,4 @@ jobs:
 
       - name: Run pytest  # Avoid relying on the pre-commit hook stage.
         run: |
-          pytest test_prompt.py
+          pytest test_prompt.py test_gentest.py

@@ -5,8 +5,8 @@ import difflib
 import json
 import optparse
 import os
+import re
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Optional, List, Dict
 
@@ -99,15 +99,39 @@ def parse_sample(file_path: Path) -> Sample:
         requirements="\n".join(sections["requirements"]).strip() if "requirements" in sections else None,
     )
 
+# Gathers statistics about token usage from current run
+TOTAL_USAGE = {
+    "input": 0,
+    "cached": 0,
+    "output": 0,
+}
+
+def print_usage(usage: openai.types.CompletionUsage | None):
+    """Display token usage of a response and gathers data for a statistics."""
+    if usage is None:
+        return
+
+    # Gather stats
+    TOTAL_USAGE["cached"] += usage.prompt_tokens_details.cached_tokens
+    TOTAL_USAGE["input"] += usage.prompt_tokens - usage.prompt_tokens_details.cached_tokens
+    TOTAL_USAGE["output"] += usage.completion_tokens
+    # Display used tokens
+    termcolor.cprint(
+        f"Used tokens - in {usage.prompt_tokens} (cached {usage.prompt_tokens_details.cached_tokens})"
+        f" - out {usage.completion_tokens} - total {usage.total_tokens}",
+        color="red",
+    )
+
 class CodeGenerator:
-    def __init__(self, model: str, reasoning_effort: Optional[str], system_prompt: str):
+    def __init__(self, model: str, reasoning_effort: Optional[str], system_prompt: str, timeout: int | float | None = None):
         """Initialize the CodeGenerator with a persistent OpenAI connection."""
         if openai is None:
             raise RuntimeError(
                 'The "openai" Python package is required to run evaluations. '
                 'Install it (e.g. `pip install -r requirements.txt`) and retry.'
             )
-        self.client = openai.Client()
+        client_kwargs = {"timeout": 60 * timeout} if timeout else {}
+        self.client = openai.Client(**client_kwargs)
         self.model = model
         self.reasoning_effort = reasoning_effort
         self.messages = [
@@ -140,6 +164,7 @@ class CodeGenerator:
         response = self.client.chat.completions.create(
             **self._get_chat_kwargs()
         )
+        print_usage(response.usage)
 
         # Capture assistant response and add it to the message history
         assistant_response = response.choices[0].message.content.strip()
@@ -156,6 +181,7 @@ class CodeGenerator:
         response = self.client.chat.completions.create(
             **self._get_chat_kwargs()
         )
+        print_usage(response.usage)
 
         # Capture assistant response and add it to the message history
         assistant_response = response.choices[0].message.content.strip()
@@ -171,7 +197,17 @@ class RunResult:
     stdout: str
     stderr: str
 
-def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tmpdir: str) -> RunResult:
+def get_first_n_failed_tests(stderr: str, n: int = 5):
+    """Extracts first n failed tests from STDERR."""
+    # Make sure the output contains tests' results
+    if "RUN UNITTEST" not in stderr or "FAILED" not in stderr:
+        return stderr
+
+    matches = re.findall(r"\[ RUN UNITTEST  \].*?\n[^\[](?:.|\n)*?\[        FAILED \].*?$", stderr, re.MULTILINE)
+    summary = stderr.rsplit("\n", maxsplit=2)[1]
+    return "\n".join(matches[:n] if n > 0 else matches) + f"\n{summary}\n"
+
+def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tmpdir: str, test_file: Path | None, additional_dslx_path: Path | None) -> RunResult:
     """Run DSLX tests using the interpreter."""
     prologue_lines = []
     if sample.prologue:
@@ -187,7 +223,15 @@ def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tm
     if not has_import_std:
         prologue_lines.append('import std;')
 
+    # Get additional tests from separate file
+    additional_tests = None
+    if test_file:
+        with test_file.open("r") as fd:
+            additional_tests = fd.read()
+
     full_code = '\n'.join(prologue_lines) + '\n\n' + strip_fences(generated_code) + "\n\n// -- tests\n\n" + strip_fences(sample.tests)
+    if additional_tests:
+        full_code += f"\n\n// -- {str(test_file)}\n\n" + additional_tests
     x_path = os.path.join(tmpdir, sample_filename + ".x")
     with open(x_path, "w") as f:
         f.write(full_code)
@@ -204,6 +248,8 @@ def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tm
         *extra_flags,
         '--compare=jit',
     ]
+    if additional_dslx_path:
+        cmd += ["--dslx_path", str(additional_dslx_path.resolve())]
     result = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
@@ -218,6 +264,7 @@ def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tm
 class EvaluateSampleResult:
     success: bool
     first_attempt_success: bool
+    generated: str | None
 
 def evaluate_sample(
     sample_path: Path,
@@ -228,6 +275,10 @@ def evaluate_sample(
     run_critic_step: bool,
     critic_model: str,
     critic_reasoning_effort: Optional[str],
+    test_file: Optional[Path],
+    reduce_test_errors: Optional[int] = None,
+    additional_dslx_path: Optional[Path] = None,
+    timeout: Optional[int] = None,
 ) -> EvaluateSampleResult:
     """Evaluate a single sample.
 
@@ -236,6 +287,10 @@ def evaluate_sample(
         model: The model to evaluate.
         reasoning_effort: The reasoning effort to use, i.e. in case of o3-mini.
         max_retries: The maximum number of retries to attempt before declaring failure.
+        test_file: The optional path where generated code will be saved.
+        reduce_test_errors: How many (at most) test failures should be provided as a feedback? If None, the whole STDERR is used.
+        additional_dslx_path: The optional path with additional DSLX modules.
+        timeout: The timeout of one request.
 
     Returns:
         A tuple containing a boolean indicating whether the sample was evaluated successfully and a boolean indicating whether the sample was evaluated successfully on the first attempt.
@@ -244,7 +299,7 @@ def evaluate_sample(
     sample_filename, _ = os.path.splitext(sample_filename)
 
     sample: Sample = parse_sample(sample_path)
-    codegen = CodeGenerator(model, reasoning_effort, SYSTEM_PROMPT)
+    codegen = CodeGenerator(model, reasoning_effort, SYSTEM_PROMPT, timeout)
 
     with CompatTemporaryDirectory(suffix=f'-{model}-{sample_filename}', delete=False) as tmpdir:
         print('tmpdir:', tmpdir)
@@ -277,7 +332,7 @@ def evaluate_sample(
                 continue
 
             # Fences look good → proceed to compile / run tests.
-            run_result = run_dslx_tests(generated_code, sample, f'{sample_filename}-attempt-{attempt}', tmpdir)
+            run_result = run_dslx_tests(generated_code, sample, f'{sample_filename}-attempt-{attempt}', tmpdir, test_file, additional_dslx_path)
 
             # From here on, normal path: run_result is defined.
 
@@ -330,18 +385,26 @@ def evaluate_sample(
                         continue
 
                 print(f"✅ Success on attempt {attempt}")
-                return EvaluateSampleResult(True, attempt == 1)
+                return EvaluateSampleResult(True, attempt == 1, all_generated[-1])
 
             print(f"❌ Error on attempt {attempt}; command: {run_result.command}")
 
-            termcolor.cprint('<<OUTPUT', color='blue')
-            print(run_result.stderr, end='')
+            if reduce_test_errors is not None:
+                first_failures = get_first_n_failed_tests(run_result.stderr, reduce_test_errors)
+            else:
+                first_failures = run_result.stderr
+            termcolor.cprint(f'<<OUTPUT {"[filtered]" if reduce_test_errors is not None else ""}', color='blue')
+            print(first_failures, end='')
             termcolor.cprint('OUTPUT', color='blue')
 
-            feedback_from_last_iteration = run_result.stderr
+            feedback_from_last_iteration = first_failures
 
     print("❌ All attempts failed.")
-    return EvaluateSampleResult(success=False, first_attempt_success=first_attempt_success)
+    return EvaluateSampleResult(
+        success=False,
+        first_attempt_success=first_attempt_success,
+        generated=all_generated[-1] if all_generated else None
+    )
 
 def get_sample_choices() -> list[str]:
     """Returns available sample names (sorted, unique)."""
@@ -358,11 +421,18 @@ def main() -> None:
     parser.add_option('--model', default=None, choices=MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(MODEL_CHOICES))
     parser.add_option('--sample', default=None, choices=get_sample_choices(), help='evaluate a single sample by name')
     parser.add_option('--only', default=None, help='comma-separated list of samples to evaluate (e.g. foo,bar,baz)')
+    parser.add_option('--external-sample', default=None, type=str, help="Path to the external sample that will be evaluated")
+    parser.add_option('--external-prompt', default=None, type=str, help="Path to the prompt to use instead of prompt.md")
     parser.add_option('--max-retries', default=3, type=int)
     parser.add_option('--reasoning-effort', default='high', choices=['low', 'medium', 'high'], help='choose a reasoning effort; choices: %s' % '|'.join(['low', 'medium', 'high']))
     parser.add_option('--no-critic', action='store_true', default=False, help='disable the requirements critic step')
     parser.add_option('--critic-model', default=None, choices=MODEL_CHOICES, help='model to use for requirements critic step (defaults to --model)')
     parser.add_option('--critic-reasoning-effort', default=None, choices=['low', 'medium', 'high'], help='reasoning effort for critic model (defaults to --reasoning-effort)')
+    parser.add_option('--test-file', type='string', default=None, help='File with additional tests')
+    parser.add_option('--save-to', type='string', default=None, help="Path where generated component should be saved")
+    parser.add_option('--reduce-test-errors', type=int, default=None, help='How many (at most) test failures should be provided as a feedback? If None, the whole STDERR is used')
+    parser.add_option('--additional-dslx-path', type=str, default=None, help='Where to look for additional DSLX modules')
+    parser.add_option('--timeout', default=None, type=int, help="Timeout of a one request in minutes")
     opts, args = parser.parse_args()
 
     if args:
@@ -376,6 +446,13 @@ def main() -> None:
 
     if opts.model is None:
         parser.error('--model is required')
+
+    # Use external prompt
+    if opts.external_prompt:
+        global PROMPT_FILE
+        global SYSTEM_PROMPT
+        PROMPT_FILE = opts.external_prompt
+        SYSTEM_PROMPT = load_system_prompt()
 
     if opts.sample and opts.only:
         parser.error('cannot specify both --sample and --only')
@@ -402,6 +479,13 @@ def main() -> None:
             deduped_only.append(name)
         sample_files = [Path(SAMPLES_DIR, name + '.md') for name in deduped_only]
 
+    if opts.external_sample:
+        # If neither sample nor only was specified, evaluate only external sample
+        if opts.sample is None and opts.only is None:
+            sample_files = [Path(opts.external_sample)]
+        else:
+            sample_files.append(Path(opts.external_sample))
+
     results: Dict[Path, EvaluateSampleResult] = {}
 
     critic_model = opts.critic_model or opts.model
@@ -417,6 +501,10 @@ def main() -> None:
             run_critic_step=not opts.no_critic,
             critic_model=critic_model,
             critic_reasoning_effort=critic_reasoning_effort,
+            test_file=Path(opts.test_file) if opts.test_file else None,
+            reduce_test_errors=opts.reduce_test_errors,
+            additional_dslx_path=Path(opts.additional_dslx_path) if opts.additional_dslx_path else None,
+            timeout=opts.timeout,
         )
         results[sample_file] = result
 
@@ -435,11 +523,21 @@ def main() -> None:
             leader = "❌"
         first_attempt = "FIRST ATTEMPT" if result.first_attempt_success else "MULTIPLE ATTEMPTS"
         print(f"{leader} {sample}: {status} ({first_attempt})")
+        if opts.save_to and result.generated:
+            opts.save_to = Path(opts.save_to)
+            opts.save_to.parent.mkdir(exist_ok=True)
+            with opts.save_to.open("w") as fd:
+                fd.write(result.generated)
+            print(f"Generated XLS saved to {str(opts.save_to)}")
 
     print("\nSummary:")
     print(f"Total Samples: {total_samples}")
     print(f"Pass Rate (First Attempt): {first_attempt_success_count / total_samples:.2%}")
     print(f"Pass Rate (All Attempts): {total_success / total_samples:.2%}")
+    print("\nUsed tokens:")
+    print(f"Input (without cached): {TOTAL_USAGE['input']}")
+    print(f"Cached tokens: {TOTAL_USAGE['cached']}")
+    print(f"Output: {TOTAL_USAGE['output']}")
 
 if __name__ == "__main__":
     main()
