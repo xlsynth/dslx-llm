@@ -16,6 +16,12 @@ from dslx_run_flags import split_dslx_run_flags_from_code
 
 PROMPT_MD_FILE = 'prompt.md'
 
+# Samples that intentionally require model-defined nominal types in signatures.
+# These are not compatible with the generic stub typecheck harness.
+STUB_TYPECHECK_SKIP = {
+    'traffic_light_fsm',
+}
+
 # Regular expression to find code fences labeled 'dslx'
 CODE_FENCE_RE = re.compile(
     r'^```dslx\s*\n(.*?)^```',
@@ -115,6 +121,9 @@ def create_samples_with_stubs() -> list[CodeSample]:
     results = []
     for filename in os.listdir('samples'):
         if not filename.endswith('.md'):
+            continue
+        sample_name = os.path.splitext(filename)[0]
+        if sample_name in STUB_TYPECHECK_SKIP:
             continue
         with open(f'samples/{filename}', 'r') as f:
             md_content = f.read()
