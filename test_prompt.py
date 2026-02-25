@@ -20,6 +20,7 @@ PROMPT_MD_FILE = 'prompt.md'
 # These are not compatible with the generic stub typecheck harness.
 STUB_TYPECHECK_SKIP = {
     'traffic_light_fsm',
+    'time_multiplexed_adder',
 }
 
 # Regular expression to find code fences labeled 'dslx'

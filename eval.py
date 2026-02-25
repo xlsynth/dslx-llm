@@ -25,6 +25,7 @@ except ModuleNotFoundError:
 
 PROMPT_FILE = "prompt.md"
 SAMPLES_DIR = "samples/"
+DEFAULT_DSLX_INTERPRETER_FLAGS = ['--type_inference_v2=true']
 
 # Models that require a reasoning effort config to be set.
 NEED_REASONING_EFFORT = set(['o3-mini', 'o4-mini', 'gpt-5.1', 'gpt-5.2'])
@@ -197,6 +198,11 @@ class RunResult:
     stdout: str
     stderr: str
 
+def format_retcode(retcode: int) -> str:
+    if retcode < 0:
+        return f"{retcode} (signal {-retcode})"
+    return str(retcode)
+
 def get_first_n_failed_tests(stderr: str, n: int = 5):
     """Extracts first n failed tests from STDERR."""
     # Make sure the output contains tests' results
@@ -236,7 +242,7 @@ def run_dslx_tests(generated_code: str, sample: Sample, sample_filename: str, tm
     with open(x_path, "w") as f:
         f.write(full_code)
 
-    extra_flags = []
+    extra_flags = list(DEFAULT_DSLX_INTERPRETER_FLAGS)
     if sample.prologue:
         extra_flags.extend(extract_dslx_run_flags(sample.prologue))
     extra_flags.extend(extract_dslx_run_flags(generated_code))
@@ -387,7 +393,11 @@ def evaluate_sample(
                 print(f"✅ Success on attempt {attempt}")
                 return EvaluateSampleResult(True, attempt == 1, all_generated[-1])
 
-            print(f"❌ Error on attempt {attempt}; command: {run_result.command}")
+            print(
+                f"❌ Error on attempt {attempt}; "
+                f"retcode: {format_retcode(run_result.retcode)}; "
+                f"command: {run_result.command}"
+            )
 
             if reduce_test_errors is not None:
                 first_failures = get_first_n_failed_tests(run_result.stderr, reduce_test_errors)

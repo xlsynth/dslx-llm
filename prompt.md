@@ -475,6 +475,8 @@ fn show_parametric_widen_2x_explicit() {
 }
 ```
 
+Important: if a callee has parametrics that cannot be deduced from argument types alone, supply those parametrics explicitly at the call site. In particular, for `std::uadd_with_overflow<V, N, M>(x: uN[N], y: uN[M]) -> (bool, uN[V])`, `V` is not determined by argument types; do not rely on contextual return-type inference. Prefer `std::uadd_with_overflow<N, N, N>(x, y)` over `std::uadd_with_overflow(x, y)` when `V` is otherwise unconstrained.
+
 **Constructing Parameterized Types** It's common to want to construct an type with a number of bits based on a compile-time constant value. `uN` is the unsigned bits type constructor (it it is the same as the `bits` keyword for historical reasons), and `sN` is the signed bits type constructor -- they can be instantiated with a literal value or a constant name or simple expressions. It is often most readable to instantiate them using a named constant:
 
 ```dslx
