@@ -22,19 +22,23 @@ from eval_shared import (
     resolve_sample_files,
 )
 
-PROMPT_FILE = "prompt.md"
-SAMPLES_DIR = "samples"
+PROMPT_FILE = "proc_eval/prompt.md"
+SAMPLES_DIR = "proc_eval/samples"
 SYSTEM_PROMPT = load_system_prompt(PROMPT_FILE)
 DSLX_CRITIC_REFERENCE = critic.load_dslx_critic_reference(PROMPT_FILE)
 
 
-def run_dslx_tests(
+def run_proc_tests(
     generated_code: str,
     sample,
     sample_filename: str,
     tmpdir: str,
     test_file: Path | None,
     additional_dslx_path: Path | None,
+    *,
+    max_ticks: Optional[int],
+    trace_channels: bool,
+    trace_calls: bool,
 ) -> RunResult:
     full_code = build_full_code(generated_code, sample, test_file)
     x_path = os.path.join(tmpdir, sample_filename + ".x")
@@ -42,13 +46,20 @@ def run_dslx_tests(
         f.write(full_code)
 
     extra_flags = collect_dslx_run_flags(generated_code, sample)
+    if max_ticks is not None:
+        extra_flags.append(f'--max_ticks={max_ticks}')
+    if trace_channels:
+        extra_flags.append('--trace_channels')
+    if trace_calls:
+        extra_flags.append('--trace_calls')
+
     cmd = [
         tools.DSLX_INTERPRETER_MAIN,
         x_path,
         '--dslx_stdlib_path',
         tools.DSLX_STDLIB_PATH,
         *extra_flags,
-        '--compare=jit',
+        '--compare=none',
     ]
     if additional_dslx_path:
         cmd += ["--dslx_path", str(additional_dslx_path.resolve())]
@@ -80,15 +91,21 @@ def evaluate_sample(
     reduce_test_errors: Optional[int] = None,
     additional_dslx_path: Optional[Path] = None,
     timeout: Optional[int] = None,
+    max_ticks: Optional[int] = None,
+    trace_channels: bool = False,
+    trace_calls: bool = False,
 ) -> EvaluateSampleResult:
     def run_candidate(generated_code, sample, attempt_filename, tmpdir):
-        return run_dslx_tests(
+        return run_proc_tests(
             generated_code,
             sample,
             attempt_filename,
             tmpdir,
             test_file,
             additional_dslx_path,
+            max_ticks=max_ticks,
+            trace_channels=trace_channels,
+            trace_calls=trace_calls,
         )
 
     return evaluate_sample_with_runner(
@@ -109,22 +126,25 @@ def evaluate_sample(
 
 def main() -> None:
     parser = optparse.OptionParser()
-    parser.add_option('--list', action='store_true', default=False, help='list available samples and exit')
+    parser.add_option('--list', action='store_true', default=False, help='list available proc samples and exit')
     parser.add_option('--model', default=None, choices=MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(MODEL_CHOICES))
-    parser.add_option('--sample', default=None, choices=get_sample_choices(SAMPLES_DIR), help='evaluate a single sample by name')
-    parser.add_option('--only', default=None, help='comma-separated list of samples to evaluate (e.g. foo,bar,baz)')
-    parser.add_option('--external-sample', default=None, type=str, help="Path to the external sample that will be evaluated")
-    parser.add_option('--external-prompt', default=None, type=str, help="Path to the prompt to use instead of prompt.md")
+    parser.add_option('--sample', default=None, choices=get_sample_choices(SAMPLES_DIR), help='evaluate a single proc sample by name')
+    parser.add_option('--only', default=None, help='comma-separated list of proc samples to evaluate (e.g. foo,bar,baz)')
+    parser.add_option('--external-sample', default=None, type=str, help="Path to the external proc sample that will be evaluated")
+    parser.add_option('--external-prompt', default=None, type=str, help="Path to the prompt to use instead of proc_eval/prompt.md")
     parser.add_option('--max-retries', default=3, type=int)
     parser.add_option('--reasoning-effort', default='high', choices=['low', 'medium', 'high'], help='choose a reasoning effort; choices: %s' % '|'.join(['low', 'medium', 'high']))
     parser.add_option('--no-critic', action='store_true', default=False, help='disable the requirements critic step')
     parser.add_option('--critic-model', default=None, choices=MODEL_CHOICES, help='model to use for requirements critic step (defaults to --model)')
     parser.add_option('--critic-reasoning-effort', default=None, choices=['low', 'medium', 'high'], help='reasoning effort for critic model (defaults to --reasoning-effort)')
-    parser.add_option('--test-file', type='string', default=None, help='File with additional tests')
-    parser.add_option('--save-to', type='string', default=None, help="Path where generated component should be saved")
-    parser.add_option('--reduce-test-errors', type=int, default=None, help='How many (at most) test failures should be provided as a feedback? If None, the whole STDERR is used')
+    parser.add_option('--test-file', type='string', default=None, help='File with additional proc tests')
+    parser.add_option('--save-to', type='string', default=None, help="Path where generated proc should be saved")
+    parser.add_option('--reduce-test-errors', type=int, default=None, help='How many (at most) test failures should be provided as feedback? If None, the whole STDERR is used')
     parser.add_option('--additional-dslx-path', type=str, default=None, help='Where to look for additional DSLX modules')
-    parser.add_option('--timeout', default=None, type=int, help="Timeout of a one request in minutes")
+    parser.add_option('--timeout', default=None, type=int, help="Timeout of one request in minutes")
+    parser.add_option('--max-ticks', default=None, type=int, help='Override the interpreter max proc ticks for this run')
+    parser.add_option('--trace-channels', action='store_true', default=False, help='Trace channel send/receive activity during proc execution')
+    parser.add_option('--trace-calls', action='store_true', default=False, help='Trace interpreted function calls during proc execution')
     opts, args = parser.parse_args()
 
     if args:
@@ -174,6 +194,9 @@ def main() -> None:
             reduce_test_errors=opts.reduce_test_errors,
             additional_dslx_path=Path(opts.additional_dslx_path) if opts.additional_dslx_path else None,
             timeout=opts.timeout,
+            max_ticks=opts.max_ticks,
+            trace_channels=opts.trace_channels,
+            trace_calls=opts.trace_calls,
         )
         results[sample_file] = result
 
