@@ -17,6 +17,9 @@ Repository for LLM prompts and Q&A samples for the XLS Domain Specific Language
 * `eval.py`: feeds the system prompt and sample prompt(s) to a model API and
   tests them against the acceptance tests, feeding back any errors that occur
   up to a max retry count. Emits a scorecard at the end as a success indicator.
+* `proc_eval.py`: proc-oriented analogue of `eval.py`, using proc-specific
+  prompt material and proc samples under `proc_eval/`.
+* `proc_eval/`: proc-specific prompt collateral, samples, and tests.
 
 To run eval on a specific sample:
 
@@ -24,6 +27,13 @@ To run eval on a specific sample:
 export OPENAI_API_KEY=""  # replace with your key
 export XLSYNTH_TOOLS=""  # replace with xlsynth tools dir via github.com/xlsynth/xlsynth/releases
 python eval.py --model gpt-3.5-turbo --sample saturating_addsub --max-retries 5
+```
+
+To list or run proc samples:
+
+```sh
+python proc_eval.py --list
+python proc_eval.py --model gpt-4o-mini --sample counter --max-retries 5
 ```
 
 ## Making the case for DSLX over Verilog
