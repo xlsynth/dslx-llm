@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import dataclasses
 import difflib
-import importlib
 import os
 import re
 from pathlib import Path
