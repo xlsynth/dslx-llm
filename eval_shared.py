@@ -7,7 +7,7 @@ import difflib
 import os
 import re
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, List
 
 import termcolor
 from tempcompat import TemporaryDirectory as CompatTemporaryDirectory
@@ -15,14 +15,10 @@ from tempcompat import TemporaryDirectory as CompatTemporaryDirectory
 import critic
 from dslx_run_flags import extract_dslx_run_flags
 from dslx_text import strip_fences
-
-try:
-    import openai  # type: ignore
-except ModuleNotFoundError:
-    openai = None
+import providers
 
 
-DEFAULT_DSLX_INTERPRETER_FLAGS = ['--type_inference_v2=true']
+DEFAULT_DSLX_INTERPRETER_FLAGS: List[str] = []
 PROMPT_REPLY_SUFFIX = (
     '\n\n**Important:** reply **only** with the DSLX code text that solves this '
     'problem, it will be piped **directly** to a DSLX interpreter! Do **not** '
@@ -30,25 +26,6 @@ PROMPT_REPLY_SUFFIX = (
     'the (hidden) acceptance test suite. I will respond with any error text '
     'that might occur when running an acceptance test suite.\n'
 )
-
-# Models that require a reasoning effort config to be set.
-NEED_REASONING_EFFORT = set(['o3-mini', 'o4-mini', 'gpt-5.1', 'gpt-5.2'])
-MODEL_CHOICES = [
-    'gpt-3.5-turbo',
-    'gpt-4o-mini',
-    'gpt-4o',
-    'o1-preview',
-    'o1-mini',
-    'o1',
-    'o1-pro',
-    'o3-mini',
-    'o3',
-    'o4-mini',
-    'gpt-4.1',
-    'gpt-4.1-mini',
-    'gpt-5.1',
-    'gpt-5.2',
-]
 
 
 def load_system_prompt(prompt_file: str | Path) -> str:
@@ -138,86 +115,6 @@ def collect_dslx_run_flags(generated_code: str, sample: Sample) -> list[str]:
     return extra_flags
 
 
-TOTAL_USAGE = {
-    "input": 0,
-    "cached": 0,
-    "output": 0,
-}
-
-
-def print_usage(usage: Any | None) -> None:
-    if usage is None:
-        return
-
-    TOTAL_USAGE["cached"] += usage.prompt_tokens_details.cached_tokens
-    TOTAL_USAGE["input"] += usage.prompt_tokens - usage.prompt_tokens_details.cached_tokens
-    TOTAL_USAGE["output"] += usage.completion_tokens
-    termcolor.cprint(
-        f"Used tokens - in {usage.prompt_tokens} (cached {usage.prompt_tokens_details.cached_tokens})"
-        f" - out {usage.completion_tokens} - total {usage.total_tokens}",
-        color="red",
-    )
-
-
-class CodeGenerator:
-    def __init__(
-        self,
-        model: str,
-        reasoning_effort: Optional[str],
-        system_prompt: str,
-        timeout: int | float | None = None,
-    ):
-        if openai is None:
-            raise RuntimeError(
-                'The "openai" Python package is required to run evaluations. '
-                'Install it (e.g. `pip install -r requirements.txt`) and retry.'
-            )
-        client_kwargs = {"timeout": 60 * timeout} if timeout else {}
-        self.client = openai.Client(**client_kwargs)
-        self.model = model
-        self.reasoning_effort = reasoning_effort
-        self.messages = [{"role": "user", "content": system_prompt}]
-
-    def _get_chat_kwargs(self):
-        if self.model in NEED_REASONING_EFFORT:
-            assert self.reasoning_effort is not None
-            return {
-                'model': self.model,
-                'reasoning_effort': self.reasoning_effort,
-                'messages': self.messages,
-            }
-        return {'model': self.model, 'messages': self.messages}
-
-    def generate_code(self, prompt: str, signature: str, prologue: Optional[str] = None) -> str:
-        message = prompt
-        if prologue:
-            message += '\n\nPrologue:\n' + prologue
-        message += '\n\nSignature:\n' + signature
-        termcolor.cprint('<<PROBLEM', color='blue')
-        print(message)
-        termcolor.cprint('PROBLEM', color='blue')
-        self.messages.append({"role": "user", "content": message})
-
-        response = self.client.chat.completions.create(**self._get_chat_kwargs())
-        print_usage(response.usage)
-
-        assistant_response = response.choices[0].message.content.strip()
-        self.messages.append({"role": "assistant", "content": assistant_response})
-
-        return assistant_response
-
-    def provide_feedback(self, error_message: str) -> str:
-        self.messages.append({"role": "user", "content": f"Error encountered:\n{error_message}"})
-
-        response = self.client.chat.completions.create(**self._get_chat_kwargs())
-        print_usage(response.usage)
-
-        assistant_response = response.choices[0].message.content.strip()
-        self.messages.append({"role": "assistant", "content": assistant_response})
-
-        return assistant_response
-
-
 @dataclasses.dataclass
 class RunResult:
     command: str
@@ -254,6 +151,7 @@ RunCandidate = Callable[[str, Sample, str, str], RunResult]
 
 def evaluate_sample_with_runner(
     sample_path: Path,
+    provider: providers.ProviderModule,
     model: str,
     *,
     system_prompt: str,
@@ -271,7 +169,7 @@ def evaluate_sample_with_runner(
     sample_filename, _ = os.path.splitext(sample_filename)
 
     sample = parse_sample(sample_path)
-    codegen = CodeGenerator(model, reasoning_effort, system_prompt, timeout)
+    codegen = provider.CodeGenerator(model, reasoning_effort, system_prompt, timeout)
 
     with CompatTemporaryDirectory(suffix=f'-{model}-{sample_filename}', delete=False) as tmpdir:
         print('tmpdir:', tmpdir)
@@ -329,11 +227,10 @@ def evaluate_sample_with_runner(
                     termcolor.cprint('CRITIQUEE', color='blue')
 
                     termcolor.cprint('<<CRITIC', color='blue')
-                    critic_result = critic.run_critic(
+                    critic_result = provider.run_critic(
                         critic_model=critic_model,
                         critic_reasoning_effort=critic_reasoning_effort,
                         generated_code=generated_code,
-                        need_reasoning_effort=NEED_REASONING_EFFORT,
                         dslx_critic_reference=dslx_critic_reference,
                         prompt=sample.prompt,
                         signature=sample.signature,
