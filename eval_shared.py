@@ -7,7 +7,7 @@ import difflib
 import os
 import re
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, List
 
 import termcolor
 from tempcompat import TemporaryDirectory as CompatTemporaryDirectory
@@ -15,9 +15,10 @@ from tempcompat import TemporaryDirectory as CompatTemporaryDirectory
 import critic
 from dslx_run_flags import extract_dslx_run_flags
 from dslx_text import strip_fences
+import providers
 
 
-DEFAULT_DSLX_INTERPRETER_FLAGS = []
+DEFAULT_DSLX_INTERPRETER_FLAGS: List[str] = []
 PROMPT_REPLY_SUFFIX = (
     '\n\n**Important:** reply **only** with the DSLX code text that solves this '
     'problem, it will be piped **directly** to a DSLX interpreter! Do **not** '
@@ -150,7 +151,7 @@ RunCandidate = Callable[[str, Sample, str, str], RunResult]
 
 def evaluate_sample_with_runner(
     sample_path: Path,
-    provider: str,
+    provider: providers.ProviderModule,
     model: str,
     *,
     system_prompt: str,

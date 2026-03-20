@@ -115,6 +115,13 @@ class CodeGenerator:
         return assistant_response
 
 
+def get_generator(*, model: str,
+                  reasoning_effort: Optional[str],
+                  system_prompt: str,
+                  timeout: int | float | None = None):
+    return CodeGenerator(model, reasoning_effort, system_prompt, timeout)
+
+
 def run_critic(
     *,
     critic_model: str,

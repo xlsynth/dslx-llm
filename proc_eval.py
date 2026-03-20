@@ -6,12 +6,9 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Optional
 
-import critic
 
-import tools
+import critic
 from eval_shared import (
-    MODEL_CHOICES,
-    TOTAL_USAGE,
     EvaluateSampleResult,
     RunResult,
     build_full_code,
@@ -21,6 +18,9 @@ from eval_shared import (
     load_system_prompt,
     resolve_sample_files,
 )
+import providers
+import tools
+
 
 PROMPT_FILE = "proc_eval/prompt.md"
 SAMPLES_DIR = "proc_eval/samples"
@@ -80,7 +80,7 @@ def run_proc_tests(
 
 def evaluate_sample(
     sample_path: Path,
-    provider: str,
+    provider: providers.ProviderModule,
     model: str,
     *,
     reasoning_effort: Optional[str],
@@ -111,6 +111,7 @@ def evaluate_sample(
 
     return evaluate_sample_with_runner(
         sample_path,
+        provider,
         model,
         system_prompt=SYSTEM_PROMPT,
         reasoning_effort=reasoning_effort,
@@ -125,7 +126,12 @@ def evaluate_sample(
     )
 
 
+# Get provide from environment as it affects model options.
+PROVIDER = os.environ.get('PROVIDER', 'openai')
+
+
 def main() -> None:
+    provider = getattr(providers, PROVIDER)
     parser = optparse.OptionParser()
     parser.add_option('--list', action='store_true', default=False, help='list available proc samples and exit')
     parser.add_option('--model', default=None, choices=provider.MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(provider.MODEL_CHOICES))

@@ -69,7 +69,7 @@ def run_dslx_tests(
 
 def evaluate_sample(
     sample_path: Path,
-    provider: str,
+    provider: providers.ProviderModule,
     model: str,
     *,
     reasoning_effort: Optional[str],
