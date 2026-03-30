@@ -507,7 +507,7 @@ Note that sometimes there are limitations on the complexity of expressions you c
 ```dslx
 fn f<N: u32>() {
     const O = N + u32:2;
-    // Note: we bound O so we don't need to write `uN[{N + u32:2}]`.
+    // Note: we bound O as we cannot write `uN[{N + u32:2}]`.
     let x: uN[O] = uN[O]:0;
     trace_fmt!("x: {}", x);
 }
