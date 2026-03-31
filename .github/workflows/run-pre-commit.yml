@@ -54,7 +54,7 @@ jobs:
       - name: Fetch latest XLSynth release
         id: fetch-xlsynth
         run: |
-          API_URL="https://api.github.com/repos/xlsynth/xlsynth/releases/latest"
+          API_URL="https://api.github.com/repos/xlsynth/xlsynth/releases/tags/v0.39.0"
           RESPONSE=$(curl -s "$API_URL")
           DSLX_INTERPRETER_BINARY_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name == "dslx_interpreter_main-ubuntu2004") | .browser_download_url')
           DSLX_TYPECHECK_BINARY_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name == "typecheck_main-ubuntu2004") | .browser_download_url')
