@@ -8,8 +8,10 @@ import urllib.request
 
 try:
     import openai  # type: ignore
+    from openai.types.responses import Response, ResponseReasoningItem, ResponseUsage
 except ModuleNotFoundError:
     openai = None
+    Response, ResponseReasoningItem, ResponseUsage = None, None, None
 import termcolor
 
 from dslx_text import strip_fences
@@ -49,6 +51,7 @@ TOTAL_USAGE = {
     "input": 0,
     "cached": 0,
     "output": 0,
+    "reasoning": 0,
 }
 _OPENROUTER_REASONING_SUPPORT: dict[str, bool] | None = None
 
@@ -138,31 +141,33 @@ def supports_reasoning_effort(model: str) -> bool:
     return get_reasoning_effort_choices(model) is not None
 
 
-def print_usage(usage: Any | None) -> None:
+def print_usage(usage: ResponseUsage | None) -> None:
     if usage is None:
         return
 
     # OpenAI-compatible backends such as vLLM can omit nested usage details, so
     # read these fields defensively instead of assuming the hosted OpenAI schema.
-    prompt_tokens_details = getattr(usage, 'prompt_tokens_details', None)
+    prompt_tokens_details = getattr(usage, 'input_tokens_details', None)
     cached_tokens = getattr(prompt_tokens_details, 'cached_tokens', 0) or 0
-    prompt_tokens = getattr(usage, 'prompt_tokens', 0) or 0
-    completion_tokens = getattr(usage, 'completion_tokens', 0) or 0
+    prompt_tokens = getattr(usage, 'input_tokens', 0) or 0
+    output_tokens = getattr(usage, 'output_tokens', 0) or 0
+    reasoning_tokens = getattr(getattr(usage, 'output_tokens_details', None), 'reasoning_tokens', 0) or 0
 
     TOTAL_USAGE["cached"] += cached_tokens
     TOTAL_USAGE["input"] += prompt_tokens - cached_tokens
-    TOTAL_USAGE["output"] += completion_tokens
+    TOTAL_USAGE["output"] += output_tokens
+    TOTAL_USAGE["reasoning"] += reasoning_tokens
     termcolor.cprint(
         f"Used tokens - in {prompt_tokens} (cached {cached_tokens})"
-        f" - out {completion_tokens} - total {getattr(usage, 'total_tokens', 0) or 0}",
+        f" - out {output_tokens} (reasoning {reasoning_tokens}) - total {getattr(usage, 'total_tokens', 0) or 0}",
         color="red",
     )
 
 
 def _chat_kwargs(model: str, reasoning_effort: Optional[str], messages):
-    kwargs = {'model': model, 'messages': messages}
+    kwargs = {'model': model, 'input': messages}
     if reasoning_effort is not None:
-        kwargs['reasoning_effort'] = reasoning_effort
+        kwargs['reasoning'] = {'effort': reasoning_effort, 'summary': 'auto'}
     kwargs.update(_request_overrides())
     return kwargs
 
@@ -191,7 +196,7 @@ def _parse_critic_json(text: str) -> dict:
 def _create_chat_completion_with_retries(client: Any, **kwargs: Any) -> Any:
     for attempt in range(1, 4):
         try:
-            return client.chat.completions.create(**kwargs)
+            return client.responses.create(**kwargs)
         except json.JSONDecodeError:
             if attempt == 3:
                 raise
@@ -200,6 +205,22 @@ def _create_chat_completion_with_retries(client: Any, **kwargs: Any) -> Any:
                 color="yellow",
             )
             time.sleep(attempt)
+
+
+def _display_section(section: str, text: str):
+    termcolor.cprint(f'<<{section}', color='blue')
+    print(text)
+    termcolor.cprint(section, color='blue')
+
+
+def _extract_response_reasoning(response: Response) -> tuple[str, ResponseReasoningItem | None]:
+    assistant_response, reasoning = "", None
+    for output in response.output:
+        if output.type == 'message':
+            assistant_response = (output.content[0].text or '').strip()
+        elif output.type == 'reasoning':
+            reasoning = output
+    return assistant_response, reasoning
 
 
 class CodeGenerator:
@@ -229,17 +250,18 @@ class CodeGenerator:
         if prologue:
             message += '\n\nPrologue:\n' + prologue
         message += '\n\nSignature:\n' + signature
-        termcolor.cprint('<<PROBLEM', color='blue')
-        print(message)
-        termcolor.cprint('PROBLEM', color='blue')
+        _display_section("PROBLEM", message)
         self.messages.append({"role": "user", "content": message})
 
         response = _create_chat_completion_with_retries(
             self.client, **self._get_chat_kwargs()
         )
         print_usage(response.usage)
+        assistant_response, reasoning = _extract_response_reasoning(response)
 
-        assistant_response = (response.choices[0].message.content or '').strip()
+        if reasoning and len(reasoning.summary) > 0:
+            _display_section("REASONING", reasoning.summary[0].text)
+
         self.messages.append({"role": "assistant", "content": assistant_response})
 
         return assistant_response
@@ -251,8 +273,11 @@ class CodeGenerator:
             self.client, **self._get_chat_kwargs()
         )
         print_usage(response.usage)
+        assistant_response, reasoning = _extract_response_reasoning(response)
 
-        assistant_response = (response.choices[0].message.content or '').strip()
+        if reasoning and len(reasoning.summary) > 0:
+            _display_section("REASONING", reasoning.summary[0].text)
+
         self.messages.append({"role": "assistant", "content": assistant_response})
 
         return assistant_response
@@ -301,7 +326,7 @@ def run_critic(
             client,
             **_chat_kwargs(critic_model, critic_reasoning_effort, messages),
         )
-        last_text = (response.choices[0].message.content or '').strip()
+        last_text, _ = _extract_response_reasoning(response)
         try:
             parsed = _parse_critic_json(last_text)
         except Exception as e:
