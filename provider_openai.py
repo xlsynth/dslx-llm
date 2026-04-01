@@ -230,6 +230,7 @@ class CodeGenerator:
         reasoning_effort: Optional[str],
         system_prompt: str,
         timeout: int | float | None = None,
+        append_reasoning_output: bool = True,
     ):
         if openai is None:
             raise RuntimeError(
@@ -241,6 +242,7 @@ class CodeGenerator:
         self.model = model
         self.reasoning_effort = reasoning_effort
         self.messages = [{"role": "user", "content": system_prompt}]
+        self.append_reasoning_output = append_reasoning_output
 
     def _get_chat_kwargs(self):
         return _chat_kwargs(self.model, self.reasoning_effort, self.messages)
@@ -260,6 +262,8 @@ class CodeGenerator:
         assistant_response, reasoning = _extract_response_reasoning(response)
 
         if reasoning and len(reasoning.summary) > 0:
+            if self.append_reasoning_output:
+                self.messages.append(reasoning)
             _display_section("REASONING", reasoning.summary[0].text)
 
         self.messages.append({"role": "assistant", "content": assistant_response})
@@ -276,6 +280,8 @@ class CodeGenerator:
         assistant_response, reasoning = _extract_response_reasoning(response)
 
         if reasoning and len(reasoning.summary) > 0:
+            if self.append_reasoning_output:
+                self.messages.append(reasoning)
             _display_section("REASONING", reasoning.summary[0].text)
 
         self.messages.append({"role": "assistant", "content": assistant_response})
