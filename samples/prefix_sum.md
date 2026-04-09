@@ -4,6 +4,20 @@
 
 Write a DSLX function that calculates the prefix sum of an array.
 
+## Requirements
+
+The following requirements will be checked by a separate critic model. The critic should treat
+comments as claims, not proof, and decide from the actual DSLX structure.
+
+- id: running_sum_loop_state
+  requirement: The implementation must use loop-carried state that evolves the running prefix sum from one element to the next, rather than recomputing each prefix independently from scratch.
+
+- id: output_array_built_incrementally
+  requirement: The output array must be built incrementally as the loop progresses, for example via tuple accumulator state plus `update(...)` on an array accumulator, or an equivalent staged construction.
+
+- id: not_quadratic_rescan_strategy
+  requirement: The implementation must not use a nested "for each output position, rescan the prefix" strategy or another obviously quadratic recomputation approach when a linear prefix accumulation is possible.
+
 ## Signature
 
 ```dslx-snippet

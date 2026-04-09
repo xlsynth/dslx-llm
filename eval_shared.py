@@ -167,11 +167,15 @@ def evaluate_sample_with_runner(
 ) -> EvaluateSampleResult:
     _, sample_filename = os.path.split(sample_path)
     sample_filename, _ = os.path.splitext(sample_filename)
+    model_slug_for_path = re.sub(r'[^A-Za-z0-9_.-]+', '_', model)
 
     sample = parse_sample(sample_path)
     codegen = provider.CodeGenerator(model, reasoning_effort, system_prompt, timeout)
 
-    with CompatTemporaryDirectory(suffix=f'-{model}-{sample_filename}', delete=False) as tmpdir:
+    with CompatTemporaryDirectory(
+        suffix=f'-{model_slug_for_path}-{sample_filename}',
+        delete=False,
+    ) as tmpdir:
         print('tmpdir:', tmpdir)
 
         all_generated = []

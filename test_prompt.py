@@ -15,6 +15,7 @@ import tools
 from dslx_run_flags import split_dslx_run_flags_from_code
 
 PROMPT_MD_FILE = 'prompt.md'
+SAMPLE_DIRS = ('samples',)
 
 # Samples that intentionally require model-defined nominal types in signatures.
 # These are not compatible with the generic stub typecheck harness.
@@ -117,24 +118,34 @@ def create_sample_with_stub(filename: str, md_content: str) -> CodeSample:
     return CodeSample(name=os.path.splitext(filename)[0], content=f'import std;\n{prologue}\n{stubs}\n{tests}')
 
 
-def create_samples_with_stubs() -> list[CodeSample]:
+def iter_sample_markdown_files(sample_dirs: tuple[str, ...]) -> list[str]:
+    """Returns sample markdown files from the requested directories."""
+    result: list[str] = []
+    for sample_dir in sample_dirs:
+        if not os.path.isdir(sample_dir):
+            continue
+        for filename in sorted(os.listdir(sample_dir)):
+            if filename.endswith('.md'):
+                result.append(os.path.join(sample_dir, filename))
+    return result
+
+
+def create_samples_with_stubs(sample_dirs: tuple[str, ...]) -> list[CodeSample]:
     """Creates samples with stubs for each DSLX code sample."""
     results = []
-    for filename in os.listdir('samples'):
-        if not filename.endswith('.md'):
-            continue
-        sample_name = os.path.splitext(filename)[0]
+    for path in iter_sample_markdown_files(sample_dirs):
+        sample_name = os.path.splitext(os.path.basename(path))[0]
         if sample_name in STUB_TYPECHECK_SKIP:
             continue
-        with open(f'samples/{filename}', 'r') as f:
+        with open(path, 'r') as f:
             md_content = f.read()
-        results.append(create_sample_with_stub(filename, md_content))
+        results.append(create_sample_with_stub(path, md_content))
     return results
 
 
 # Extract code samples from the markdown file
 PROMPT_CODE_SAMPLES = extract_dslx_code_samples(PROMPT_MD_FILE)
-SAMPLES_WITH_STUBS = create_samples_with_stubs()
+SAMPLES_WITH_STUBS = create_samples_with_stubs(SAMPLE_DIRS)
 
 
 def run_on_single_file(binary: str, code_sample: str, more_flags: tuple[str, ...] = ()):
@@ -191,28 +202,28 @@ def test_prompt_size():
 
 # Added test for replacing signature with naive_reference in samples that contain 'fn naive_reference'
 NAIVE_REFERENCE_FILES = [
-    filename for filename in os.listdir("samples")
-    if filename.endswith(".md") and "fn naive_reference" in open(os.path.join("samples", filename)).read()
+    path for path in iter_sample_markdown_files(SAMPLE_DIRS)
+    if "fn naive_reference" in open(path).read()
 ]
 
-@pytest.mark.parametrize("sample_filename", NAIVE_REFERENCE_FILES)
-def test_naive_reference_replacement(sample_filename: str) -> None:
+@pytest.mark.parametrize("sample_path", NAIVE_REFERENCE_FILES, ids=lambda x: x)
+def test_naive_reference_replacement(sample_path: str) -> None:
     # Get the DSLX snippet from the `## Tests` section of the sample markdown file.
     # First we need to extract the `Tests` section then we extract the fence from within that.
-    with open(os.path.join("samples", sample_filename), "r") as f:
+    with open(sample_path, "r") as f:
         content = f.read()
     tests_re = re.compile(r"^## Tests\n(.*)", re.DOTALL | re.MULTILINE)
     tests_match = tests_re.search(content)
     if tests_match:
         dslx_code = tests_match.group(1).strip()
     else:
-        pytest.skip(f"No tests section found in {sample_filename}")
+        pytest.skip(f"No tests section found in {sample_path}")
     tests_fence_re = re.compile(r"```dslx-snippet(.*?)```", re.DOTALL)
     tests_fence_match = tests_fence_re.search(dslx_code)
     if tests_fence_match:
         dslx_code = tests_fence_match.group(1).strip()
     else:
-        pytest.skip(f"No dslx-snippet fence found in tests section of {sample_filename}")
+        pytest.skip(f"No dslx-snippet fence found in tests section of {sample_path}")
 
     if prologue := try_extract_prologue(content):
         dslx_code = f"{prologue}\n{dslx_code}"
@@ -230,7 +241,7 @@ def test_naive_reference_replacement(sample_filename: str) -> None:
         assert signature_match is not None, f"No function name found in signature: {signature}"
         signature_name = signature_match.group(1)
     else:
-        pytest.skip(f"No dslx-snippet fence found in signature section of {sample_filename}")
+        pytest.skip(f"No dslx-snippet fence found in signature section of {sample_path}")
 
     print(f"Signature name: {signature_name!r}")
 

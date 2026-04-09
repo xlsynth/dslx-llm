@@ -118,6 +118,12 @@ def main() -> None:
     parser = optparse.OptionParser()
     parser.add_option('--list', action='store_true', default=False, help='list available samples and exit')
     parser.add_option('--model', default=None, choices=provider.MODEL_CHOICES, help='choose a model to query; choices: %s' % '|'.join(provider.MODEL_CHOICES))
+    parser.add_option(
+        '--custom-model-slug',
+        default=None,
+        type='string',
+        help='use an arbitrary provider model slug instead of the built-in --model choices',
+    )
     parser.add_option('--sample', default=None, choices=get_sample_choices(SAMPLES_DIR), help='evaluate a single sample by name')
     parser.add_option('--only', default=None, help='comma-separated list of samples to evaluate (e.g. foo,bar,baz)')
     parser.add_option('--external-sample', default=None, type=str, help="Path to the external sample that will be evaluated")
@@ -143,8 +149,13 @@ def main() -> None:
             print(name)
         return
 
-    if opts.model is None:
-        parser.error('--model is required')
+    if opts.model is not None and opts.custom_model_slug is not None:
+        parser.error('cannot specify both --model and --custom-model-slug')
+
+    if opts.model is None and opts.custom_model_slug is None:
+        parser.error('either --model or --custom-model-slug is required')
+
+    model = opts.custom_model_slug or opts.model
 
     if opts.external_prompt:
         global PROMPT_FILE
@@ -164,7 +175,7 @@ def main() -> None:
 
     results: Dict[Path, EvaluateSampleResult] = {}
 
-    critic_model = opts.critic_model or opts.model
+    critic_model = opts.critic_model or model
     critic_reasoning_effort = opts.critic_reasoning_effort or opts.reasoning_effort
 
     for sample_file in sample_files:
@@ -172,7 +183,7 @@ def main() -> None:
         result = evaluate_sample(
             sample_file,
             provider,
-            opts.model,
+            model,
             reasoning_effort=opts.reasoning_effort,
             max_retries=opts.max_retries,
             run_critic_step=not opts.no_critic,

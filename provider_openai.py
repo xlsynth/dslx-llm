@@ -42,12 +42,19 @@ def print_usage(usage: Any | None) -> None:
     if usage is None:
         return
 
-    TOTAL_USAGE["cached"] += usage.prompt_tokens_details.cached_tokens
-    TOTAL_USAGE["input"] += usage.prompt_tokens - usage.prompt_tokens_details.cached_tokens
-    TOTAL_USAGE["output"] += usage.completion_tokens
+    # OpenAI-compatible backends such as vLLM can omit nested usage details, so
+    # read these fields defensively instead of assuming the hosted OpenAI schema.
+    prompt_tokens_details = getattr(usage, 'prompt_tokens_details', None)
+    cached_tokens = getattr(prompt_tokens_details, 'cached_tokens', 0) or 0
+    prompt_tokens = getattr(usage, 'prompt_tokens', 0) or 0
+    completion_tokens = getattr(usage, 'completion_tokens', 0) or 0
+
+    TOTAL_USAGE["cached"] += cached_tokens
+    TOTAL_USAGE["input"] += prompt_tokens - cached_tokens
+    TOTAL_USAGE["output"] += completion_tokens
     termcolor.cprint(
-        f"Used tokens - in {usage.prompt_tokens} (cached {usage.prompt_tokens_details.cached_tokens})"
-        f" - out {usage.completion_tokens} - total {usage.total_tokens}",
+        f"Used tokens - in {prompt_tokens} (cached {cached_tokens})"
+        f" - out {completion_tokens} - total {getattr(usage, 'total_tokens', 0) or 0}",
         color="red",
     )
 
@@ -102,7 +109,7 @@ class CodeGenerator:
         response = self.client.chat.completions.create(**self._get_chat_kwargs())
         print_usage(response.usage)
 
-        assistant_response = response.choices[0].message.content.strip()
+        assistant_response = (response.choices[0].message.content or '').strip()
         self.messages.append({"role": "assistant", "content": assistant_response})
 
         return assistant_response
@@ -113,7 +120,7 @@ class CodeGenerator:
         response = self.client.chat.completions.create(**self._get_chat_kwargs())
         print_usage(response.usage)
 
-        assistant_response = response.choices[0].message.content.strip()
+        assistant_response = (response.choices[0].message.content or '').strip()
         self.messages.append({"role": "assistant", "content": assistant_response})
 
         return assistant_response
@@ -161,7 +168,7 @@ def run_critic(
         response = client.chat.completions.create(
             **_chat_kwargs(critic_model, critic_reasoning_effort, messages)
         )
-        last_text = response.choices[0].message.content.strip()
+        last_text = (response.choices[0].message.content or '').strip()
         try:
             parsed = _parse_critic_json(last_text)
         except Exception as e:

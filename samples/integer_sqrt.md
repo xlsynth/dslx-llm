@@ -4,6 +4,20 @@
 
 Write a DSLX function that computes the integer square root of a given non-negative integer. Use the **non-restoring algorithm**. The function should be parameterizable for different bit widths. The function should return the floor of the square root of the input value.
 
+## Requirements
+
+The following requirements will be checked by a separate critic model. The critic should treat
+comments as claims, not proof, and decide from the actual DSLX structure.
+
+- id: bounded_iterative_algorithm
+  requirement: The implementation must use a bounded iterative formulation, such as a counted DSLX `for` loop over root-digit or bit-pair steps, rather than a `while` loop, brute-force search over candidates, or a direct closed-form expression.
+
+- id: non_restoring_state_update
+  requirement: The implementation must maintain explicit step-to-step algorithm state consistent with a non-restoring square-root method, such as partial remainder and partial root (or equivalent state variables), and update that state each iteration.
+
+- id: not_builtin_or_linear_search
+  requirement: The implementation must not call a built-in square-root helper, convert through floating-point to compute the answer, or linearly search candidate roots by checking `r * r <= value`.
+
 ## Signature
 
 ```dslx-snippet
