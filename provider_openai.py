@@ -2,6 +2,8 @@
 
 import dataclasses
 import json
+import os
+import time
 from typing import Optional, List, Dict, Any
 
 try:
@@ -62,14 +64,46 @@ def print_usage(usage: Any | None) -> None:
 def _chat_kwargs(model: str, reasoning_effort: Optional[str], messages):
     if model in NEED_REASONING_EFFORT:
         assert reasoning_effort is not None
-        return {'model': model, 'reasoning_effort': reasoning_effort, 'messages': messages}
-    return {'model': model, 'messages': messages}
+        kwargs = {'model': model, 'reasoning_effort': reasoning_effort, 'messages': messages}
+    else:
+        kwargs = {'model': model, 'messages': messages}
+    kwargs.update(_request_overrides())
+    return kwargs
+
+
+def _request_overrides() -> dict[str, Any]:
+    provider_only = os.environ.get('OPENROUTER_PROVIDER_ONLY')
+    if not provider_only:
+        return {}
+
+    only = [value.strip() for value in provider_only.split(',') if value.strip()]
+    provider: dict[str, Any] = {'only': only}
+
+    allow_fallbacks = os.environ.get('OPENROUTER_ALLOW_FALLBACKS')
+    if allow_fallbacks is not None:
+        provider['allow_fallbacks'] = allow_fallbacks.lower() in ('1', 'true', 'yes')
+
+    return {'extra_body': {'provider': provider}}
 
 
 def _parse_critic_json(text: str) -> dict:
     # Allow the critic to wrap the JSON in a triple-backtick block.
     raw = strip_fences(text).strip()
     return json.loads(raw)
+
+
+def _create_chat_completion_with_retries(client: Any, **kwargs: Any) -> Any:
+    for attempt in range(1, 4):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except json.JSONDecodeError:
+            if attempt == 3:
+                raise
+            termcolor.cprint(
+                f"Malformed JSON response from OpenAI-compatible backend; retrying ({attempt}/3)...",
+                color="yellow",
+            )
+            time.sleep(attempt)
 
 
 class CodeGenerator:
@@ -106,7 +140,9 @@ class CodeGenerator:
         termcolor.cprint('PROBLEM', color='blue')
         self.messages.append({"role": "user", "content": message})
 
-        response = self.client.chat.completions.create(**self._get_chat_kwargs())
+        response = _create_chat_completion_with_retries(
+            self.client, **self._get_chat_kwargs()
+        )
         print_usage(response.usage)
 
         assistant_response = (response.choices[0].message.content or '').strip()
@@ -117,7 +153,9 @@ class CodeGenerator:
     def provide_feedback(self, error_message: str) -> str:
         self.messages.append({"role": "user", "content": f"Error encountered:\n{error_message}"})
 
-        response = self.client.chat.completions.create(**self._get_chat_kwargs())
+        response = _create_chat_completion_with_retries(
+            self.client, **self._get_chat_kwargs()
+        )
         print_usage(response.usage)
 
         assistant_response = (response.choices[0].message.content or '').strip()
@@ -165,8 +203,9 @@ def run_critic(
 
     last_text = ""
     for _attempt in range(1, 3):
-        response = client.chat.completions.create(
-            **_chat_kwargs(critic_model, critic_reasoning_effort, messages)
+        response = _create_chat_completion_with_retries(
+            client,
+            **_chat_kwargs(critic_model, critic_reasoning_effort, messages),
         )
         last_text = (response.choices[0].message.content or '').strip()
         try:
