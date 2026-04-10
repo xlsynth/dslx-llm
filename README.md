@@ -20,6 +20,8 @@ Repository for LLM prompts and Q&A samples for the XLS Domain Specific Language
 * `proc_eval.py`: proc-oriented analogue of `eval.py`, using proc-specific
   prompt material and proc samples under `proc_eval/`.
 * `proc_eval/`: proc-specific prompt collateral, samples, and tests.
+* `docs/openrouter.md`: how to run the harness against arbitrary hosted models
+  through OpenRouter.
 
 To run eval on a specific sample:
 

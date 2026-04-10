@@ -56,6 +56,7 @@ A simple smoke test:
 ```bash
 python eval.py \
   --custom-model-slug openai/gpt-5.4 \
+  --reasoning-effort low \
   --sample majority \
   --max-retries 1
 ```
@@ -80,6 +81,11 @@ python eval.py \
   --max-retries 1
 ```
 
+If you use a separate critic model and that critic model also supports
+reasoning effort, pass `--critic-reasoning-effort` as well. When the critic
+model is the same as the main model, the evaluator reuses the main
+`--reasoning-effort` value by default.
+
 To list available samples:
 
 ```bash
@@ -93,6 +99,7 @@ To evaluate the whole sample suite:
 ```bash
 python eval.py \
   --custom-model-slug google/gemini-2.5-pro \
+  --reasoning-effort high \
   --max-retries 1
 ```
 
@@ -102,6 +109,8 @@ The scorecard prints:
 - first-attempt pass rate
 - all-attempt pass rate
 - token usage totals collected from the OpenAI-compatible response schema
+- the evaluated model variant, including reasoning level when present, e.g.
+  `openai/gpt-5.4@low`
 
 ## Proc samples
 
@@ -110,6 +119,7 @@ The same environment setup works for proc-oriented evaluation:
 ```bash
 python proc_eval.py \
   --custom-model-slug openai/gpt-5.4 \
+  --reasoning-effort low \
   --sample counter \
   --max-retries 1
 ```
@@ -172,6 +182,12 @@ A model can fail for several distinct reasons:
 
 Using OpenRouter does not change the benchmark semantics. The evaluator still
 judges the model by the generated DSLX and the acceptance tests in this repo.
+
+One OpenRouter-specific detail: for some slugs, the repo can detect that
+reasoning parameters are supported but cannot discover the exact allowed enum
+from OpenRouter metadata alone. In those cases the CLI validates against the
+repo's known superset of reasoning levels, and the upstream provider may still
+reject a specific unsupported level for that model.
 
 ## Troubleshooting
 
