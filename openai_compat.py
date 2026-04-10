@@ -15,7 +15,7 @@ The intended mental model is:
 
 In practice that means this module is the right place for tasks such as:
 
-- deciding whether a model supports a reasoning-effort parameter,
+- passing through an already-validated reasoning-effort parameter,
 - building a Responses API request payload from harness inputs,
 - extracting plain text from different response object layouts,
 - translating usage accounting fields into one common token-total tuple.
@@ -24,12 +24,10 @@ In practice that means this module is the right place for tasks such as:
 from __future__ import annotations
 
 import dataclasses
-import re
 from typing import Any, Optional
 
 
-REASONING_EFFORT_CHOICES = ['none', 'low', 'medium', 'high', 'xhigh']
-_REASONING_MODEL_RE = re.compile(r'^(gpt-5(?:$|[-.])|o[1-9](?:$|[-.]))')
+REASONING_EFFORT_CHOICES = ('none', 'minimal', 'low', 'medium', 'high', 'xhigh')
 
 
 @dataclasses.dataclass(frozen=True)
@@ -55,32 +53,6 @@ def _get_field(value: Any, name: str, default: Any = None) -> Any:
     return getattr(value, name, default)
 
 
-def supports_reasoning_effort(model: str) -> bool:
-    """Returns whether the model name appears to support reasoning effort.
-
-    This is a conservative name-based check used to decide whether it is valid
-    to attach a reasoning-effort setting to a request. It is intentionally a
-    lightweight heuristic rather than a capability probe.
-    """
-    return bool(_REASONING_MODEL_RE.match(model.lower()))
-
-
-def resolve_reasoning_effort(model: str, reasoning_effort: Optional[str]) -> Optional[str]:
-    """Normalizes the requested reasoning-effort setting for one model.
-
-    `none` is treated as an explicit request to omit the field entirely. When
-    the caller does not specify a value, reasoning-capable models default to
-    `high` so the harness preserves its current behavior.
-    """
-    if reasoning_effort == 'none':
-        return None
-    if reasoning_effort is not None:
-        return reasoning_effort
-    if supports_reasoning_effort(model):
-        return 'high'
-    return None
-
-
 def build_responses_request(
     *,
     model: str,
@@ -102,9 +74,8 @@ def build_responses_request(
     }
     if instructions is not None:
         kwargs['instructions'] = instructions
-    effective_reasoning_effort = resolve_reasoning_effort(model, reasoning_effort)
-    if effective_reasoning_effort is not None:
-        kwargs['reasoning'] = {'effort': effective_reasoning_effort}
+    if reasoning_effort is not None:
+        kwargs['reasoning'] = {'effort': reasoning_effort}
     return kwargs
 
 

@@ -15,6 +15,12 @@ class ClassGenerator(Protocol):
 
 class ProviderModule(Protocol):
     @staticmethod
+    def supports_reasoning_effort(model: str) -> bool: ...
+
+    @staticmethod
+    def get_reasoning_effort_choices(model: str) -> tuple[str, ...] | None: ...
+
+    @staticmethod
     def CodeGenerator(
             model: str,
             reasoning_effort: Optional[str],

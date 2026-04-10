@@ -69,6 +69,17 @@ python eval.py \
   --max-retries 1
 ```
 
+Some hosted models expose a reasoning-effort knob. When the selected model
+supports it, `dslx-llm` now requires an explicit `--reasoning-effort` value:
+
+```bash
+python eval.py \
+  --custom-model-slug openai/gpt-5.4 \
+  --reasoning-effort high \
+  --sample majority \
+  --max-retries 1
+```
+
 To list available samples:
 
 ```bash

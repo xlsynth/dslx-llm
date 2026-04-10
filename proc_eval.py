@@ -14,8 +14,11 @@ from eval_shared import (
     build_full_code,
     collect_dslx_run_flags,
     evaluate_sample_with_runner,
+    format_model_variant,
     get_sample_choices,
     load_system_prompt,
+    REASONING_EFFORT_CHOICES,
+    resolve_reasoning_efforts,
     resolve_sample_files,
 )
 import providers
@@ -146,10 +149,23 @@ def main() -> None:
     parser.add_option('--external-sample', default=None, type=str, help="Path to the external proc sample that will be evaluated")
     parser.add_option('--external-prompt', default=None, type=str, help="Path to the prompt to use instead of proc_eval/prompt.md")
     parser.add_option('--max-retries', default=3, type=int)
-    parser.add_option('--reasoning-effort', default='high', choices=['low', 'medium', 'high'], help='choose a reasoning effort; choices: %s' % '|'.join(['low', 'medium', 'high']))
+    parser.add_option(
+        '--reasoning-effort',
+        default=None,
+        choices=REASONING_EFFORT_CHOICES,
+        help='reasoning effort for reasoning-capable models; choices: %s'
+             % '|'.join(REASONING_EFFORT_CHOICES),
+    )
     parser.add_option('--no-critic', action='store_true', default=False, help='disable the requirements critic step')
     parser.add_option('--critic-model', default=None, choices=provider.MODEL_CHOICES, help='model to use for requirements critic step (defaults to --model)')
-    parser.add_option('--critic-reasoning-effort', default=None, choices=['low', 'medium', 'high'], help='reasoning effort for critic model (defaults to --reasoning-effort)')
+    parser.add_option(
+        '--critic-reasoning-effort',
+        default=None,
+        choices=REASONING_EFFORT_CHOICES,
+        help='reasoning effort for reasoning-capable critic models '
+             '(defaults to --reasoning-effort when the critic model matches); '
+             'choices: %s' % '|'.join(REASONING_EFFORT_CHOICES),
+    )
     parser.add_option('--test-file', type='string', default=None, help='File with additional proc tests')
     parser.add_option('--save-to', type='string', default=None, help="Path where generated proc should be saved")
     parser.add_option('--reduce-test-errors', type=int, default=None, help='How many (at most) test failures should be provided as feedback? If None, the whole STDERR is used')
@@ -196,15 +212,25 @@ def main() -> None:
     results: Dict[Path, EvaluateSampleResult] = {}
 
     critic_model = opts.critic_model or model
-    critic_reasoning_effort = opts.critic_reasoning_effort or opts.reasoning_effort
+    reasoning_effort, critic_reasoning_effort = resolve_reasoning_efforts(
+        parser,
+        provider,
+        model=model,
+        reasoning_effort=opts.reasoning_effort,
+        run_critic_step=not opts.no_critic,
+        critic_model=critic_model,
+        critic_reasoning_effort=opts.critic_reasoning_effort,
+    )
+    model_variant = format_model_variant(model, reasoning_effort)
+    critic_variant = format_model_variant(critic_model, critic_reasoning_effort)
 
     for sample_file in sample_files:
-        print(f"Evaluating {sample_file}...")
+        print(f"Evaluating {sample_file} with {model_variant}...")
         result = evaluate_sample(
             sample_file,
             provider,
             model,
-            reasoning_effort=opts.reasoning_effort,
+            reasoning_effort=reasoning_effort,
             max_retries=opts.max_retries,
             run_critic_step=not opts.no_critic,
             critic_model=critic_model,
@@ -224,6 +250,9 @@ def main() -> None:
     first_attempt_success_count = sum(1 for r in results.values() if r.first_attempt_success)
 
     print("\n=== SCORECARD ===")
+    print(f"Model: {model_variant}")
+    if not opts.no_critic:
+        print(f"Critic: {critic_variant}")
     for sample, result in results.items():
         if result.success:
             status = "PASS"
