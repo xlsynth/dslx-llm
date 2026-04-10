@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
-import dataclasses
 import json
-from typing import Optional, List, Dict, Any
+from typing import Optional, Any
 
 from google import genai
 from google.genai import types
@@ -11,13 +10,14 @@ import termcolor
 
 from dslx_text import strip_fences
 import critic
+from openai_compat import REASONING_EFFORT_CHOICES
 
 
-NEED_REASONING_EFFORT = set([
+SUPPORTED_REASONING_MODELS = {
     'gemini-3-flash-preview',
     'gemini-3.1-flash-lite-preview',
     'gemini-3.1-pro-preview',
-])
+}
 MODEL_CHOICES = [
     'gemini-3-flash-preview',
     'gemini-3.1-flash-lite-preview',
@@ -44,9 +44,18 @@ def print_usage(usage: Any | None) -> None:
     )
 
 
+def supports_reasoning_effort(model: str) -> bool:
+    return model in SUPPORTED_REASONING_MODELS
+
+
+def get_reasoning_effort_choices(model: str) -> tuple[str, ...] | None:
+    if model in SUPPORTED_REASONING_MODELS:
+        return tuple(level for level in REASONING_EFFORT_CHOICES if level in ('low', 'medium', 'high'))
+    return None
+
+
 def _chat_kwargs(model: str, reasoning_effort: Optional[str], messages):
-    if model in NEED_REASONING_EFFORT:
-        assert reasoning_effort is not None
+    if reasoning_effort is not None:
         return {
             'model': model,
             'contents': [types.Content(
@@ -67,8 +76,6 @@ def _parse_critic_json(text: str) -> dict:
 
 
 class CodeGenerator:
-    # Models that require a reasoning effort config to be set.
-
     def __init__(
         self,
         model: str,

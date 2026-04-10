@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import difflib
+import optparse
 import os
 import re
 from pathlib import Path
@@ -15,6 +16,7 @@ from tempcompat import TemporaryDirectory as CompatTemporaryDirectory
 import critic
 from dslx_run_flags import extract_dslx_run_flags
 from dslx_text import strip_fences
+from openai_compat import REASONING_EFFORT_CHOICES
 import providers
 
 
@@ -149,6 +151,16 @@ class EvaluateSampleResult:
 RunCandidate = Callable[[str, Sample, str, str], RunResult]
 
 
+def format_model_variant(model: str, reasoning_effort: Optional[str]) -> str:
+    if reasoning_effort is None:
+        return model
+    return f'{model}@{reasoning_effort}'
+
+
+def sanitize_model_variant_for_path(model: str, reasoning_effort: Optional[str]) -> str:
+    return re.sub(r'[^A-Za-z0-9_.@-]+', '_', format_model_variant(model, reasoning_effort))
+
+
 def evaluate_sample_with_runner(
     sample_path: Path,
     provider: providers.ProviderModule,
@@ -167,11 +179,15 @@ def evaluate_sample_with_runner(
 ) -> EvaluateSampleResult:
     _, sample_filename = os.path.split(sample_path)
     sample_filename, _ = os.path.splitext(sample_filename)
+    model_slug_for_path = sanitize_model_variant_for_path(model, reasoning_effort)
 
     sample = parse_sample(sample_path)
     codegen = provider.CodeGenerator(model, reasoning_effort, system_prompt, timeout)
 
-    with CompatTemporaryDirectory(suffix=f'-{model}-{sample_filename}', delete=False) as tmpdir:
+    with CompatTemporaryDirectory(
+        suffix=f'-{model_slug_for_path}-{sample_filename}',
+        delete=False,
+    ) as tmpdir:
         print('tmpdir:', tmpdir)
 
         all_generated = []
@@ -319,3 +335,61 @@ def resolve_sample_files(
             sample_files.append(Path(external_sample))
 
     return sample_files
+
+
+def resolve_reasoning_efforts(
+    parser: optparse.OptionParser,
+    provider: providers.ProviderModule,
+    *,
+    model: str,
+    reasoning_effort: Optional[str],
+    run_critic_step: bool,
+    critic_model: str,
+    critic_reasoning_effort: Optional[str],
+) -> tuple[Optional[str], Optional[str]]:
+    reasoning_choices = provider.get_reasoning_effort_choices(model)
+    if reasoning_choices is None:
+        if reasoning_effort is not None:
+            parser.error(
+                f'--reasoning-effort cannot be used with non-reasoning model {model!r}'
+            )
+    else:
+        if reasoning_effort is None:
+            parser.error(
+                f'--reasoning-effort is required for reasoning-capable model {model!r}; '
+                f'allowed values: {", ".join(reasoning_choices)}'
+            )
+        if reasoning_effort not in reasoning_choices:
+            parser.error(
+                f'--reasoning-effort={reasoning_effort!r} is not supported by model '
+                f'{model!r}; allowed values: {", ".join(reasoning_choices)}'
+            )
+
+    if not run_critic_step:
+        return reasoning_effort, None
+
+    if critic_reasoning_effort is None and critic_model == model:
+        critic_reasoning_effort = reasoning_effort
+
+    critic_reasoning_choices = provider.get_reasoning_effort_choices(critic_model)
+    if critic_reasoning_choices is None:
+        if critic_reasoning_effort is not None:
+            parser.error(
+                '--critic-reasoning-effort cannot be used with non-reasoning '
+                f'critic model {critic_model!r}'
+            )
+    else:
+        if critic_reasoning_effort is None:
+            parser.error(
+                f'--critic-reasoning-effort is required for reasoning-capable '
+                f'critic model {critic_model!r}; allowed values: '
+                f'{", ".join(critic_reasoning_choices)}'
+            )
+        if critic_reasoning_effort not in critic_reasoning_choices:
+            parser.error(
+                f'--critic-reasoning-effort={critic_reasoning_effort!r} is not '
+                f'supported by critic model {critic_model!r}; allowed values: '
+                f'{", ".join(critic_reasoning_choices)}'
+            )
+
+    return reasoning_effort, critic_reasoning_effort

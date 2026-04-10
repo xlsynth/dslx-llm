@@ -7,6 +7,20 @@ Implement a function that computes the number of leading zeros in an N-bit unsig
 Count the number of consecutive `0`-bits starting from the most-significant bit, until the first
 `1`-bit is encountered. If the input is `0`, the function should return `N`.
 
+## Requirements
+
+The following requirements will be checked by a separate critic model. The critic should treat
+comments as claims, not proof, and decide from the actual DSLX structure.
+
+- id: loop_carried_found_state
+  requirement: The implementation must use a bounded DSLX `for` loop with loop-carried state that tracks both the running zero count and whether the first `1` bit has already been seen, or an equivalent two-state formulation.
+
+- id: not_builtin_clz
+  requirement: The implementation must not solve the problem by calling a built-in such as `clz` or by wrapping such a built-in in a helper. The counting behavior should be expressed directly in the DSLX implementation.
+
+- id: scan_from_msb_toward_lsb
+  requirement: The loop/dataflow should examine bit positions from the most-significant side toward the least-significant side, carrying the "done" condition forward once a `1` is encountered.
+
 ## Signature
 
 ```dslx-snippet
