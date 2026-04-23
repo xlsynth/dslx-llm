@@ -28,6 +28,11 @@ PROMPT_REPLY_SUFFIX = (
     'the (hidden) acceptance test suite. I will respond with any error text '
     'that might occur when running an acceptance test suite.\n'
 )
+# List of prefixes that are added to the prologue (if not present)
+APPEND_PREFIX = [
+    'import std;',
+    '#![feature(generics)]',
+]
 
 
 def load_system_prompt(prompt_file: str | Path) -> str:
@@ -86,12 +91,13 @@ def build_full_code(generated_code: str, sample: Sample, test_file: Path | None)
         for line in prologue.splitlines():
             prologue_lines.append(line.strip())
 
-    has_import_std = (
-        'import std;' in generated_code
-        or any(line.strip() == 'import std;' for line in prologue_lines)
-    )
-    if not has_import_std:
-        prologue_lines.append('import std;')
+    for prefix in APPEND_PREFIX:
+        has_prefix = (
+            prefix in generated_code
+            or any(line.strip() == prefix for line in prologue_lines)
+        )
+        if not has_prefix:
+            prologue_lines.append(prefix)
 
     additional_tests = None
     if test_file:

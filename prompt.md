@@ -394,6 +394,8 @@ fn show_for_loop_with_tuple_accumulator() {
 }
 ```
 
+Note that `range` function is deprecated. Instead of e.g. `range(u32:0, u32:5)` use `u32:0..u32:5`.
+
 **No While Loops** Since functions in DSLX are not turing-complete there are no while loops, everything must be done with bounded loops; i.e. counted `for` loops. This is different from Rust.
 
 **Range Builtin for Iota** To make an array that’s filled with a range of values (sometimes also called “iota”) use exclusive range syntax:
