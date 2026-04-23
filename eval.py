@@ -253,7 +253,10 @@ def main() -> None:
     print("\nUsed tokens:")
     print(f"Input (without cached): {provider.TOTAL_USAGE['input']}")
     print(f"Cached tokens: {provider.TOTAL_USAGE['cached']}")
-    print(f"Output: {provider.TOTAL_USAGE['output']}")
+    reasoning_tokens = ""
+    if "reasoning" in provider.TOTAL_USAGE:
+        reasoning_tokens = f" (including reasoning: {provider.TOTAL_USAGE['reasoning']})"
+    print(f"Output: {provider.TOTAL_USAGE['output']}" + reasoning_tokens)
 
 
 if __name__ == "__main__":
