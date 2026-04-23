@@ -149,28 +149,25 @@ SAMPLES_WITH_STUBS = create_samples_with_stubs(SAMPLE_DIRS)
 
 
 def run_on_single_file(binary: str, code_sample: str, more_flags: tuple[str, ...] = ()):
-    with tempfile.NamedTemporaryFile('w', suffix='.x', delete=False) as tmp:
+    with tempfile.NamedTemporaryFile('w', suffix='.x') as tmp:
         tmp.write(code_sample)
         tmp_filename = tmp.name
 
-    print(f'Running {binary} ({os.path.realpath(binary)}) with stdlib {tools.DSLX_STDLIB_PATH} on {tmp_filename} ...')
-    print('Contents:\n<<EOF\n', code_sample, '\n<<EOF\n', sep='')
+        print(f'Running {binary} ({os.path.realpath(binary)}) with stdlib {tools.DSLX_STDLIB_PATH} on {tmp_filename} ...')
+        print('Contents:\n<<EOF\n', code_sample, '\n<<EOF\n', sep='')
 
-    cmd = [binary]
-    cmd.extend(list(more_flags))
-    cmd.append(tmp_filename)
-    cmd.append('--dslx_stdlib_path')
-    cmd.append(tools.DSLX_STDLIB_PATH)
+        cmd = [binary]
+        cmd.extend(list(more_flags))
+        cmd.append(tmp_filename)
+        cmd.append('--dslx_stdlib_path')
+        cmd.append(tools.DSLX_STDLIB_PATH)
 
-    try:
         result = subprocess.run(cmd, capture_output=True, text=True)
         assert result.returncode == 0, (
             f"Non-zero exit code: {result.returncode}\n"
             f"stdout:\n<<STDOUT\n{result.stdout}\nSTDOUT\n"
             f"stderr:\n<<STDERR\n{result.stderr}\nSTDERR\n"
         )
-    finally:
-        os.remove(tmp_filename)
 
 @pytest.mark.parametrize('code_sample', PROMPT_CODE_SAMPLES)
 def test_prompt_code_sample(code_sample: str):
