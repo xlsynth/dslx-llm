@@ -1,10 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 import json
 from typing import Optional, Any
 
-from google import genai
-from google.genai import types
+try:
+    from google import genai
+    from google.genai import types
+except ModuleNotFoundError:
+    genai = None
+    types = None
 
 import termcolor
 
@@ -56,6 +62,12 @@ def get_reasoning_effort_choices(model: str) -> tuple[str, ...] | None:
 
 def _chat_kwargs(model: str, reasoning_effort: Optional[str], messages):
     if reasoning_effort is not None:
+        if types is None:
+            raise RuntimeError(
+                'The "google-genai" Python package is required to use Google '
+                'reasoning models. Install it (e.g. `pip install -r '
+                'requirements.txt`) and retry.'
+            )
         return {
             'model': model,
             'contents': [types.Content(
@@ -83,6 +95,12 @@ class CodeGenerator:
         system_prompt: str,
         timeout: int | float | None = None,
     ):
+        if genai is None or types is None:
+            raise RuntimeError(
+                'The "google-genai" Python package is required to use the '
+                'Google provider. Install it (e.g. `pip install -r '
+                'requirements.txt`) and retry.'
+            )
         self.client = genai.Client(http_options=types.HttpOptions(timeout=timeout))
         self.model = model
         self.reasoning_effort = reasoning_effort
@@ -132,6 +150,13 @@ def run_critic(
     requirements: str,
     generated_code: str,
 ) -> critic.CriticResult:
+    if genai is None:
+        raise RuntimeError(
+            'The "google-genai" Python package is required to use the Google '
+            'provider. Install it (e.g. `pip install -r requirements.txt`) '
+            'and retry.'
+        )
+
     candidate = strip_fences(generated_code).strip()
     user_message = (
         'Problem prompt:\n'

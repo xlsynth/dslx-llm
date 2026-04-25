@@ -32,12 +32,14 @@ else:
         ) -> None:
             self._delete = delete
             # Call parent without the ``delete`` kwarg (not supported <3.12).
-            super().__init__(
-                suffix=suffix,
-                prefix=prefix,
-                dir=dir,
-                ignore_cleanup_errors=ignore_cleanup_errors,
-            )
+            kwargs = {
+                "suffix": suffix,
+                "prefix": prefix,
+                "dir": dir,
+            }
+            if sys.version_info >= (3, 10):
+                kwargs["ignore_cleanup_errors"] = ignore_cleanup_errors
+            super().__init__(**kwargs)
 
         def cleanup(self) -> None:  # type: ignore[override]
             """Conditionally remove the directory respecting *delete*."""
