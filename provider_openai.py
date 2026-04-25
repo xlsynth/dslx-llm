@@ -24,11 +24,13 @@ from openai_compat import REASONING_EFFORT_CHOICES
 # docs. We key these by the canonical first-party model id and also reuse them
 # for equivalent OpenRouter slugs after stripping the leading `openai/`.
 KNOWN_REASONING_LEVEL_CHOICES = {
+    'gpt-5': ('minimal', 'low', 'medium', 'high'),
     'gpt-5.1': ('none', 'low', 'medium', 'high'),
     'gpt-5.2': ('none', 'low', 'medium', 'high', 'xhigh'),
     'gpt-5.4': ('none', 'low', 'medium', 'high', 'xhigh'),
     'gpt-5.4-mini': ('none', 'low', 'medium', 'high', 'xhigh'),
     'gpt-5.4-nano': ('none', 'low', 'medium', 'high', 'xhigh'),
+    'gpt-5.5': ('none', 'low', 'medium', 'high', 'xhigh'),
     'gpt-oss-20b': ('low', 'medium', 'high'),
     'gpt-oss-120b': ('low', 'medium', 'high'),
 }
@@ -45,8 +47,10 @@ MODEL_CHOICES = [
     'o4-mini',
     'gpt-4.1',
     'gpt-4.1-mini',
+    'gpt-5',
     'gpt-5.1',
     'gpt-5.2',
+    'gpt-5.5',
 ]
 TOTAL_USAGE = {
     "input": 0,
