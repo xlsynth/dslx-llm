@@ -29,6 +29,7 @@ KNOWN_REASONING_LEVEL_CHOICES = {
     'gpt-5.4': ('none', 'low', 'medium', 'high', 'xhigh'),
     'gpt-5.4-mini': ('none', 'low', 'medium', 'high', 'xhigh'),
     'gpt-5.4-nano': ('none', 'low', 'medium', 'high', 'xhigh'),
+    'gpt-5.5': ('none', 'low', 'medium', 'high', 'xhigh'),
     'gpt-oss-20b': ('low', 'medium', 'high'),
     'gpt-oss-120b': ('low', 'medium', 'high'),
 }
@@ -47,6 +48,7 @@ MODEL_CHOICES = [
     'gpt-4.1-mini',
     'gpt-5.1',
     'gpt-5.2',
+    'gpt-5.5',
 ]
 TOTAL_USAGE = {
     "input": 0,
