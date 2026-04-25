@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 import json
 import os
 import time
@@ -7,11 +9,10 @@ from typing import Optional, Any
 import urllib.request
 
 try:
-    import openai  # type: ignore
+    import openai
     from openai.types.responses import Response, ResponseReasoningItem, ResponseUsage
 except ModuleNotFoundError:
-    openai = None
-    Response, ResponseReasoningItem, ResponseUsage = None, None, None
+    openai = None  # type: ignore[assignment]
 import termcolor
 
 from dslx_text import strip_fences
@@ -217,7 +218,8 @@ def _extract_response_reasoning(response: Response) -> tuple[str, ResponseReason
     assistant_response, reasoning = "", None
     for output in response.output:
         if output.type == 'message':
-            assistant_response = (output.content[0].text or '').strip()
+            content = output.content[0] if output.content else None
+            assistant_response = (getattr(content, 'text', None) or '').strip()
         elif output.type == 'reasoning':
             reasoning = output
     return assistant_response, reasoning
@@ -237,11 +239,11 @@ class CodeGenerator:
                 'The "openai" Python package is required to run evaluations. '
                 'Install it (e.g. `pip install -r requirements.txt`) and retry.'
             )
-        client_kwargs = {"timeout": 60 * timeout} if timeout else {}
+        client_kwargs: dict[str, Any] = {"timeout": 60 * timeout} if timeout else {}
         self.client = openai.Client(**client_kwargs)
         self.model = model
         self.reasoning_effort = reasoning_effort
-        self.messages = [{"role": "user", "content": system_prompt}]
+        self.messages: list[Any] = [{"role": "user", "content": system_prompt}]
         self.append_reasoning_output = append_reasoning_output
 
     def _get_chat_kwargs(self):
