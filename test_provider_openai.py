@@ -13,6 +13,16 @@ def test_gpt_5_reasoning_effort_choices():
     assert provider_openai.get_reasoning_effort_choices('openai/gpt-5') == expected
 
 
+def test_gpt_54_is_builtin_model_choice():
+    assert 'gpt-5.4' in provider_openai.MODEL_CHOICES
+
+
+def test_gpt_54_reasoning_effort_choices():
+    expected = ('none', 'low', 'medium', 'high', 'xhigh')
+    assert provider_openai.get_reasoning_effort_choices('gpt-5.4') == expected
+    assert provider_openai.get_reasoning_effort_choices('openai/gpt-5.4') == expected
+
+
 def test_gpt_55_is_builtin_model_choice():
     assert 'gpt-5.5' in provider_openai.MODEL_CHOICES
 
