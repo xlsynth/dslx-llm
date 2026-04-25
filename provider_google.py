@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import json
-from typing import Optional, Any
+from typing import Optional, Any, cast
 
 try:
     from google import genai
     from google.genai import types
 except ModuleNotFoundError:
-    genai = None
-    types = None
+    genai = None  # type: ignore[assignment]
+    types = None  # type: ignore[assignment]
 
 import termcolor
 
@@ -68,14 +68,17 @@ def _chat_kwargs(model: str, reasoning_effort: Optional[str], messages):
                 'reasoning models. Install it (e.g. `pip install -r '
                 'requirements.txt`) and retry.'
             )
+        google_types = types
         return {
             'model': model,
-            'contents': [types.Content(
+            'contents': [google_types.Content(
                 role=m['role'],
-                parts=[types.Part.from_text(text=m['content'])]
+                parts=[google_types.Part.from_text(text=m['content'])]
             ) for m in messages],
-            'config': types.GenerateContentConfig(
-                thinking_config=types.ThinkingConfig(thinking_level=reasoning_effort)
+            'config': google_types.GenerateContentConfig(
+                thinking_config=google_types.ThinkingConfig(
+                    thinking_level=cast(Any, reasoning_effort)
+                )
             ),
         }
     return {'model': model, 'contents': messages}
@@ -85,6 +88,10 @@ def _parse_critic_json(text: str) -> dict:
     # Allow the critic to wrap the JSON in a triple-backtick block.
     raw = strip_fences(text).strip()
     return json.loads(raw)
+
+
+def _response_text(response: Any) -> str:
+    return (response.text or '').strip()
 
 
 class CodeGenerator:
@@ -101,7 +108,12 @@ class CodeGenerator:
                 'Google provider. Install it (e.g. `pip install -r '
                 'requirements.txt`) and retry.'
             )
-        self.client = genai.Client(http_options=types.HttpOptions(timeout=timeout))
+        google_genai = genai
+        google_types = types
+        timeout_ms = int(timeout) if timeout is not None else None
+        self.client = google_genai.Client(
+            http_options=google_types.HttpOptions(timeout=timeout_ms)
+        )
         self.model = model
         self.reasoning_effort = reasoning_effort
         self.messages = [{'role': 'user', 'content': system_prompt}]
@@ -123,7 +135,7 @@ class CodeGenerator:
         response = self.client.models.generate_content(**self._get_chat_kwargs())
         print_usage(response.usage_metadata)
 
-        assistant_response = response.text.strip()
+        assistant_response = _response_text(response)
         self.messages.append({'role': 'assistant', 'content': assistant_response})
 
         return assistant_response
@@ -134,7 +146,7 @@ class CodeGenerator:
         response = self.client.models.generate_content(**self._get_chat_kwargs())
         print_usage(response.usage_metadata)
 
-        assistant_response = response.text.strip()
+        assistant_response = _response_text(response)
         self.messages.append({'role': 'assistant', 'content': assistant_response})
 
         return assistant_response
@@ -172,7 +184,8 @@ def run_critic(
         '```'
     )
 
-    client = genai.Client()
+    google_genai = genai
+    client = google_genai.Client()
     messages = [
         {'role': 'system', 'content': critic.CRITIC_SYSTEM_PROMPT},
         {'role': 'user', 'content': user_message},
@@ -183,7 +196,7 @@ def run_critic(
         response = client.models.generate_content(
             **_chat_kwargs(critic_model, critic_reasoning_effort, messages)
         )
-        last_text = response.text.strip()
+        last_text = _response_text(response)
         try:
             parsed = _parse_critic_json(last_text)
         except Exception as e:
