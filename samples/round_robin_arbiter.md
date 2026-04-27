@@ -8,19 +8,18 @@ The state is a pointer to the first requestor that should be considered for
 priority in the current cycle. Requestor indices use LSB-zero bit numbering.
 Assume `N > 1` and `pointer < N`.
 
-Semantics:
+Arbitration contract:
 
 - Grant at most one requestor.
-- Starting at `pointer`, scan requestors in increasing index order, wrapping
-  from `N - 1` back to zero, and grant the first requested index found.
-- If no request bit is set, return a zero grant and leave the pointer
-  unchanged.
+- When any request is set, grant the requested index with highest cyclic
+  priority relative to `pointer`; `pointer` itself has highest priority,
+  followed by increasing indices modulo `N`.
+- If no request bit is set, return a zero grant.
 - A nonzero grant is accepted only when `grant_ready` is true.
 - If a grant is accepted, the next pointer is one past the granted index,
   wrapping from `N - 1` back to zero.
-- If a grant is not accepted because `grant_ready` is false, return the grant
-  but leave the pointer unchanged so the same priority point is retried next
-  cycle.
+- With no request, or with an unaccepted grant because `grant_ready` is false,
+  leave the pointer unchanged.
 
 The prologue will be automatically included, just implement the signature in
 the output answer.

@@ -9,22 +9,24 @@ group. LSB-zero bit index `group * LANES + lane` corresponds to that lane in
 that group. Assume `GROUPS > 1`, `LANES > 1`, `state.group_ptr < GROUPS`, and
 each `state.lane_ptrs[g] < LANES`.
 
-Hierarchical arbitration semantics:
+Hierarchical arbitration contract:
 
-- First choose a group. Starting at `state.group_ptr`, scan groups in
-  increasing order, wrapping from `GROUPS - 1` back to zero. A group is
-  request-active if any of its lanes request.
-- Then choose a lane only inside the chosen group. Starting at that group's
-  `state.lane_ptrs[group]`, scan lanes in increasing order, wrapping from
-  `LANES - 1` back to zero.
-- Return a one-hot flattened grant for the chosen group/lane.
-- If there are no requests in any group, return a zero grant and leave all
-  state unchanged.
-- A nonzero grant is accepted only when `grant_ready` is true.
-- If a grant is accepted, update `group_ptr` to one past the chosen group and
-  update only the chosen group's lane pointer to one past the chosen lane.
-- If a grant is not accepted because `grant_ready` is false, return the grant
-  but leave all state unchanged.
+- A group is request-active when any lane in that group requests.
+- The granted group, when one exists, is the request-active group with highest
+  cyclic priority relative to `state.group_ptr`; `state.group_ptr` itself has
+  highest priority, followed by increasing group numbers modulo `GROUPS`.
+- The granted lane is chosen only among lanes of the granted group. It is the
+  requesting lane with highest cyclic priority relative to
+  `state.lane_ptrs[group]`, using increasing lane numbers modulo `LANES`.
+- The grant is one-hot at flattened bit index `group * LANES + lane`. If no
+  group is request-active, the grant is zero.
+- State changes only when a nonzero grant is accepted, and acceptance requires
+  `grant_ready == true`.
+- On an accepted grant, `group_ptr` becomes one past the granted group modulo
+  `GROUPS`, and only the granted group's lane pointer becomes one past the
+  granted lane modulo `LANES`.
+- With no request, or with an unaccepted grant because `grant_ready == false`,
+  all state is unchanged.
 
 The prologue will be automatically included, just implement the signature in
 the output answer.
@@ -36,10 +38,10 @@ critic should treat comments as claims, not proof, and decide from actual DSLX
 structure.
 
 - id: two_level_selection
-  requirement: The implementation must select a request-active group first, then select a lane within that group, rather than treating all requestors as one flat round-robin ring.
+  requirement: The grant choice must obey the two-level priority contract: group priority determines the granted group, and lane priority applies only within that group, rather than treating all requestors as one flat round-robin ring.
 
 - id: per_group_lane_state
-  requirement: The implementation must maintain independent lane pointers for each group and update only the chosen group's lane pointer on an accepted grant.
+  requirement: Lane priority state must be independent per group, and an accepted grant must change only the lane pointer for the granted group.
 
 ## Prologue
 
