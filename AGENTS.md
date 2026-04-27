@@ -18,6 +18,21 @@ When creating new samples, make the intended temporal interface explicit in the 
 - Do not use exhaustive quickcheck for very large spaces (for example 32-bit or 64-bit cartesian input domains), as runs can be killed for resource use.
 - For large domains, use regular randomized `#[quickcheck]` and keep a few focused deterministic tests for key edge cases.
 
+## Contract-Style Sample Prompts
+
+When writing sample prompts, describe the required behavior as a contract
+rather than as pseudocode for an implementation.
+
+- Define observable semantics: valid inputs, output values, tie-breaking rules,
+  ordering conventions, and state transitions.
+- For priority or arbitration logic, prefer contract terms like "highest cyclic
+  priority relative to pointer" over step-by-step loop descriptions.
+- Keep architectural requirements precise when they matter to the sample, but
+  frame them as properties the implementation must satisfy rather than a recipe
+  for how to compute them.
+- Use examples and tests to remove ambiguity instead of embedding a full
+  algorithm in prose.
+
 ## Reference Implementation Contamination
 
 Acceptance tests are included in the prompt context during evaluation, so test
