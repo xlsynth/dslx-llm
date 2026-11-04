@@ -57,7 +57,7 @@ jobs:
       - name: Run mypy
         run: |
           mkdir -p "$RUNNER_TEMP/fake-xlsynth/xls/dslx/stdlib"
-          XLSYNTH_TOOLS="$RUNNER_TEMP/fake-xlsynth" python -m mypy .
+          XLSYNTH_TOOLS="$RUNNER_TEMP/fake-xlsynth" python -m mypy --python-version "${{ matrix.python-version }}" .
 
   pre-commit:
     runs-on: ubuntu-latest
