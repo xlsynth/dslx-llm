@@ -29,12 +29,7 @@ With W=8, F=3, raw inputs (1, 4, 1) give 1.5 and output 2, while
 would therefore be incorrect. Raw inputs (64, 16, -127) give output 1;
 saturating the product before accumulation would also be incorrect.
 
-The prologue will be automatically included; implement only the signature.
-
-## Prologue
-
-```dslx
-```
+Implement the function with the signature below.
 
 ## Signature
 
