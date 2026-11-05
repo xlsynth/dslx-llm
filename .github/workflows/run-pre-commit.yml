@@ -8,7 +8,7 @@ on:
 
 jobs:
   python-compat:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     strategy:
       fail-fast: false
@@ -60,7 +60,7 @@ jobs:
           XLSYNTH_TOOLS="$RUNNER_TEMP/fake-xlsynth" python -m mypy --python-version "${{ matrix.python-version }}" .
 
   pre-commit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Install libc++ from llvm-18
@@ -149,4 +149,4 @@ jobs:
 
       - name: Run pytest  # Avoid relying on the pre-commit hook stage.
         run: |
-          pytest test_prompt.py test_gentest.py
+          pytest test_prompt.py test_gentest.py test_fixed_point_mac.py

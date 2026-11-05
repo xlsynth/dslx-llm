@@ -1,5 +1,12 @@
 # Agent Guidance
 
+## Repository Purpose
+
+This is a public, reusable collection of samples for evaluators assessing how
+well models write DSLX. Keep contributions useful across models, evaluators, and
+environments. Do not add user-specific experiment logs, machine names or local
+paths, account details, or model-trial artifacts to sample documentation.
+
 ## Sample Signature Patterns
 
 When creating new samples, make the intended temporal interface explicit in the signature and prompt.
@@ -33,19 +40,31 @@ rather than as pseudocode for an implementation.
 - Use examples and tests to remove ambiguity instead of embedding a full
   algorithm in prose.
 
-## Reference Implementation Contamination
+## Test Quality and Answer Leakage
 
-Acceptance tests are included in the prompt context during evaluation, so test
-helpers can accidentally teach the model how to solve the sample.
+Tests should distinguish correct solutions from plausible mistakes without
+publishing the target DSLX solution. Being absent from the initial prompt is not
+enough: public files, documentation, fixtures, and commit history can enter
+training data. Review the whole change for answer leakage before publishing.
 
-- Prefer explicit expected-value tables, small exhaustive truth tables, and
-  invariant-style quickchecks over generic golden/reference implementations.
-- Avoid adding a parametric `golden_reference` helper that solves the same
-  problem as the requested function; that can make the sample measure copying
-  from the tests instead of problem solving.
-- A small fixed-width naive helper or table is acceptable when the intended
-  difficulty is the arbitrary-width/parametric implementation, not the small
-  instance itself.
-- If a reference-like helper is necessary, keep it narrowly scoped to the test
-  case and avoid naming it `golden`, `reference`, or similar unless it is
-  intentionally part of the task design.
+- Prefer DSLX acceptance tests: representative edge cases, invariants, metamorphic
+  relations, and postcondition checks. A predicate that checks a proposed result
+  can be more appropriate than a helper that constructs the answer.
+- Test boundary behavior, invalid assumptions, and operation ordering; avoid
+  relying only on weak properties that many incorrect programs satisfy. Use
+  reduced-width exhaustiveness where feasible and mutation checks to establish
+  that plausible wrong implementations fail for semantic reasons.
+- Python is appropriate for involved validation. An independently checked Python
+  reference is more acceptable than a complete target-language implementation:
+  it validates semantics without publishing the exact DSLX answer. Keep it out
+  of model input and prefer independent formulations to merely translating the
+  candidate algorithm.
+- Do not commit complete target DSLX implementations, including in fixtures,
+  documentation, or mutation-test scaffolding. Keep such development aids outside
+  the public repository. Renaming a reference helper does not prevent leakage.
+- Avoid exhaustive answer tables when focused examples or property checks provide
+  equivalent coverage. Do not weaken correctness checks just to hide answers;
+  document unavoidable coverage/disclosure tradeoffs concisely.
+- Check the actual prompt assembly path. The function evaluator initially sends
+  prompt, signature, and prologue; acceptance tests execute locally, and repair
+  feedback can reveal failing test details. Other evaluation paths may differ.
